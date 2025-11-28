@@ -1,0 +1,186 @@
+"use client"
+
+import { useState, useRef } from "react"
+import { useRouter } from "next/navigation"
+import { ChevronRight, BookOpen, Sparkles } from "lucide-react"
+
+export default function LoginPage() {
+  const router = useRouter()
+  const [username, setUsername] = useState("")
+  const [role, setRole] = useState("student")
+  const [error, setError] = useState("")
+  const [isLoading, setIsLoading] = useState(false)
+  const usernameRef = useRef<HTMLInputElement | null>(null)
+
+  const handleLogin = () => {
+    if (!username.trim()) {
+      setError("Please enter a username")
+      return
+    }
+
+    // Enforce globally unique usernames across all roles (case-insensitive)
+    const uname = username.trim()
+    setIsLoading(true)
+
+    setTimeout(() => {
+      try {
+        const raw = localStorage.getItem("users")
+        const users: Array<{ username: string; role: string }> = raw ? JSON.parse(raw) : []
+
+        const existing = users.find((u) => u.username.toLowerCase() === uname.toLowerCase())
+
+        if (existing) {
+          if (existing.role !== role) {
+            setError("This username is already taken by another role. Please choose a different username.")
+            setIsLoading(false)
+            return
+          }
+          // existing user with same role -> allow login
+        } else {
+          // create new user and persist
+          users.push({ username: uname, role })
+          localStorage.setItem("users", JSON.stringify(users))
+        }
+
+        const user = { username: uname, role }
+        localStorage.setItem("user", JSON.stringify(user))
+
+        if (role === "admin") {
+          router.push("/admin/dashboard")
+        } else if (role === "teacher") {
+          router.push("/teacher/dashboard")
+        } else {
+          router.push("/student/dashboard")
+        }
+      } catch (err) {
+        setError("An error occurred while signing in. Please try again.")
+        setIsLoading(false)
+        console.error(err)
+      }
+    }, 500)
+  }
+
+  const handleSignInClick = () => {
+    // Scroll the login card into view and focus the username input
+    if (usernameRef.current) {
+      usernameRef.current.scrollIntoView({ behavior: "smooth", block: "center" })
+      usernameRef.current.focus()
+    }
+  }
+
+  const roles = [
+    { id: "admin", label: "Admin", icon: "⚙️", description: "Manage system" },
+    { id: "teacher", label: "Teacher", icon: "👨‍🏫", description: "Track students" },
+    { id: "student", label: "Student", icon: "👨‍🎓", description: "View grades" },
+  ]
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex flex-col">
+      {/* Header */}
+      <nav className="flex items-center justify-between px-8 py-6 border-b border-border/50 bg-white/50 backdrop-blur-sm sticky top-0 z-50">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-cyan-600 rounded-lg flex items-center justify-center">
+            <BookOpen className="w-5 h-5 text-white" />
+          </div>
+          <span className="text-xl font-bold text-foreground">EduMatrix</span>
+        </div>
+        <div className="flex items-center gap-6 text-sm">
+          <button
+            onClick={handleSignInClick}
+            className="px-4 py-2 text-primary font-semibold hover:bg-primary/5 rounded-lg transition-colors"
+          >
+            Sign in
+          </button>
+        </div>
+      </nav>
+
+      {/* Main Content */}
+      <div className="flex-1 flex items-center justify-center px-4 py-12">
+        <div className="w-full max-w-md space-y-8">
+          {/* Hero Text */}
+          <div className="text-center space-y-3">
+            <div className="flex items-center justify-center gap-2 mb-4">
+              <Sparkles className="w-5 h-5 text-blue-600" />
+              <span className="text-sm font-semibold text-blue-600">Student Management</span>
+            </div>
+            <h1 className="text-5xl font-bold tracking-tight">
+              Manage students
+              <br />
+              <span className="bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">
+                intelligently
+              </span>
+            </h1>
+            <p className="text-lg text-muted-foreground">
+              Track attendance, manage results, and inspire student success with EduMatrix.
+            </p>
+          </div>
+
+          {/* Login Card */}
+          <form
+            onSubmit={(e) => {
+              e.preventDefault()
+              handleLogin()
+            }}
+            className="bg-white rounded-2xl shadow-xl p-8 space-y-6 border border-border/50"
+          >
+            {/* Username Input */}
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-foreground">Username</label>
+              <input
+                type="text"
+                value={username}
+                ref={usernameRef}
+                onChange={(e) => {
+                  setUsername(e.target.value)
+                  setError("")
+                }}
+                placeholder="Enter your username"
+                className="w-full px-4 py-3 bg-input border border-border rounded-lg focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all placeholder:text-muted-foreground"
+              />
+            </div>
+
+            {/* Role Selection */}
+            <div className="space-y-3">
+              <label className="text-sm font-semibold text-foreground">Select Role</label>
+              <div className="grid grid-cols-3 gap-2">
+                {roles.map((r) => (
+                  <button
+                    type="button"
+                    key={r.id}
+                    onClick={() => setRole(r.id)}
+                    className={`p-3 rounded-lg font-medium text-sm transition-all ${
+                      role === r.id
+                        ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20"
+                        : "bg-secondary/5 text-foreground border border-border hover:bg-secondary/10"
+                    }`}
+                  >
+                    <div className="text-xl mb-1">{r.icon}</div>
+                    {r.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Error Message */}
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded-lg text-sm">{error}</div>
+            )}
+
+            {/* Login Button */}
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              {isLoading ? "Signing in..." : "Continue"}
+              {!isLoading && <ChevronRight className="w-4 h-4" />}
+            </button>
+            </form>
+
+          {/* Footer */}
+          <p className="text-center text-xs text-muted-foreground">Demo mode • Use any username to explore</p>
+        </div>
+      </div>
+    </div>
+  )
+}
