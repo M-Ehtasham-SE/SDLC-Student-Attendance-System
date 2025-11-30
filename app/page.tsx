@@ -122,6 +122,76 @@ export default function LoginPage() {
     }
   }
 
+  // handler used by Set Password modal (supports Enter submitting the form)
+  const handleSetPassword = async () => {
+    setIsSetting(true)
+    setSetPwError("")
+    try {
+      const np = newPassword || ""
+      if (!np) {
+        setSetPwError("Please enter a new password")
+        setIsSetting(false)
+        return
+      }
+      if (np !== confirmPassword) {
+        setSetPwError("Passwords do not match")
+        setIsSetting(false)
+        return
+      }
+      const st = checkStrength(np)
+      if (st.score < 4) {
+        setSetPwError("Password too weak — use 8+ chars, mix upper/lower, a digit and a symbol")
+        setIsSetting(false)
+        return
+      }
+
+      // hash and check uniqueness
+      const hashed = await hashPassword(np)
+      const raw = localStorage.getItem("users")
+      const users: any[] = raw ? JSON.parse(raw) : []
+      // ensure nobody else has this same password hash
+      const conflict = users.find((u) => u.password && u.password === hashed)
+      if (conflict) {
+        setSetPwError("This password is already used by another account. Choose a different password.")
+        setIsSetting(false)
+        return
+      }
+
+      // find the target user — prefer by id if available
+      const targetIndex = users.findIndex((u) => (u.username || "").toLowerCase() === (username || "").trim().toLowerCase() && u.role === role)
+      if (targetIndex === -1) {
+        setSetPwError("Account not found. Please check your username and role.")
+        setIsSetting(false)
+        return
+      }
+
+      users[targetIndex].password = hashed
+      localStorage.setItem("users", JSON.stringify(users))
+
+      // log activity
+      try {
+        const rawAct = localStorage.getItem("activities")
+        const acts = rawAct ? JSON.parse(rawAct) : []
+        acts.push({ action: `Password set for ${users[targetIndex].username} (id:${users[targetIndex].id})`, timestamp: Date.now() })
+        localStorage.setItem("activities", JSON.stringify(acts))
+      } catch (e) {
+        console.error(e)
+      }
+
+      // dispatch and auto-login
+      window.dispatchEvent(new Event("activities-updated"))
+      const sess = { username: users[targetIndex].username, role: users[targetIndex].role }
+      localStorage.setItem("user", JSON.stringify(sess))
+      setShowSetPwModal(false)
+      setIsSetting(false)
+      router.push(users[targetIndex].role === "admin" ? "/admin/dashboard" : users[targetIndex].role === "teacher" ? "/teacher/dashboard" : "/student/dashboard")
+    } catch (e) {
+      console.error(e)
+      setSetPwError("Failed to set password — try again")
+      setIsSetting(false)
+    }
+  }
+
   const handleSignInClick = () => {
     // Scroll the login card into view and focus the username input
     if (usernameRef.current) {
@@ -315,7 +385,13 @@ export default function LoginPage() {
                 {showSetPwModal && (
                   <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
                     <div className="absolute inset-0 bg-black/50" onClick={() => setShowSetPwModal(false)} />
-                    <div className="relative z-10 w-full max-w-md p-6 bg-white rounded-lg shadow-lg">
+                    <form
+                      onSubmit={async (e) => {
+                        e.preventDefault()
+                        await handleSetPassword()
+                      }}
+                      className="relative z-10 w-full max-w-md p-6 bg-white rounded-lg shadow-lg"
+                    >
                       <h3 className="text-lg font-bold mb-3 text-foreground">Set a password for your account</h3>
                       <p className="text-sm text-muted-foreground mb-4">Create a strong password so you can sign in going forward.</p>
 
@@ -353,87 +429,21 @@ export default function LoginPage() {
 
                       <div className="flex gap-3 mt-4">
                         <button
+                          type="button"
                           onClick={() => setShowSetPwModal(false)}
                           className="flex-1 px-4 py-2 border rounded-lg text-foreground hover:bg-muted"
                         >
                           Cancel
                         </button>
                         <button
-                          onClick={async () => {
-                            setIsSetting(true)
-                            setSetPwError("")
-                            try {
-                              const np = newPassword || ""
-                              if (!np) {
-                                setSetPwError("Please enter a new password")
-                                setIsSetting(false)
-                                return
-                              }
-                              if (np !== confirmPassword) {
-                                setSetPwError("Passwords do not match")
-                                setIsSetting(false)
-                                return
-                              }
-                              const st = checkStrength(np)
-                              if (st.score < 4) {
-                                setSetPwError("Password too weak — use 8+ chars, mix upper/lower, a digit and a symbol")
-                                setIsSetting(false)
-                                return
-                              }
-
-                              // hash and check uniqueness
-                              const hashed = await hashPassword(np)
-                              const raw = localStorage.getItem("users")
-                              const users: any[] = raw ? JSON.parse(raw) : []
-                              // ensure nobody else has this same password hash
-                              const conflict = users.find((u) => u.password && u.password === hashed)
-                              if (conflict) {
-                                setSetPwError("This password is already used by another account. Choose a different password.")
-                                setIsSetting(false)
-                                return
-                              }
-
-                              // find the target user — prefer by id if available
-                              const targetIndex = users.findIndex((u) => (u.username || "").toLowerCase() === (username || "").trim().toLowerCase() && u.role === role)
-                              if (targetIndex === -1) {
-                                setSetPwError("Account not found. Please check your username and role.")
-                                setIsSetting(false)
-                                return
-                              }
-
-                              users[targetIndex].password = hashed
-                              localStorage.setItem("users", JSON.stringify(users))
-
-                              // log activity
-                              try {
-                                const rawAct = localStorage.getItem("activities")
-                                const acts = rawAct ? JSON.parse(rawAct) : []
-                                acts.push({ action: `Password set for ${users[targetIndex].username} (id:${users[targetIndex].id})`, timestamp: Date.now() })
-                                localStorage.setItem("activities", JSON.stringify(acts))
-                              } catch (e) {
-                                console.error(e)
-                              }
-
-                              // dispatch and auto-login
-                              window.dispatchEvent(new Event("activities-updated"))
-                              const sess = { username: users[targetIndex].username, role: users[targetIndex].role }
-                              localStorage.setItem("user", JSON.stringify(sess))
-                              setShowSetPwModal(false)
-                              setIsSetting(false)
-                              router.push(users[targetIndex].role === "admin" ? "/admin/dashboard" : users[targetIndex].role === "teacher" ? "/teacher/dashboard" : "/student/dashboard")
-                            } catch (e) {
-                              console.error(e)
-                              setSetPwError("Failed to set password — try again")
-                              setIsSetting(false)
-                            }
-                          }}
+                          type="submit"
                           className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-60"
                           disabled={isSetting}
                         >
                           {isSetting ? "Setting…" : "Set password & sign in"}
                         </button>
                       </div>
-                    </div>
+                    </form>
                   </div>
                 )}
 
