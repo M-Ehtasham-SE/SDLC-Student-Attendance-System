@@ -9,6 +9,7 @@ interface User {
   email: string
   role: "student" | "teacher" | "admin"
   status: "active" | "inactive"
+  password?: string
 }
 
 export default function UsersPage() {
@@ -21,10 +22,10 @@ export default function UsersPage() {
       // ignore
     }
     return [
-      { id: "1", username: "johnsmith", email: "john@example.com", role: "student", status: "active" },
-      { id: "2", username: "sarahteacher", email: "sarah@example.com", role: "teacher", status: "active" },
-      { id: "3", username: "mikeadmin", email: "mike@example.com", role: "admin", status: "active" },
-      { id: "4", username: "emmastudent", email: "emma@example.com", role: "student", status: "inactive" },
+      { id: "1", username: "johnsmith", email: "john@example.com", role: "student", status: "active", password: "password_john" },
+      { id: "2", username: "sarahteacher", email: "sarah@example.com", role: "teacher", status: "active", password: "password_sarah" },
+      { id: "3", username: "mikeadmin", email: "mike@example.com", role: "admin", status: "active", password: "password_mike" },
+      { id: "4", username: "emmastudent", email: "emma@example.com", role: "student", status: "inactive", password: "password_emma" },
     ]
   })
 
@@ -33,7 +34,7 @@ export default function UsersPage() {
   const [enrollingUserId, setEnrollingUserId] = useState<string | null>(null)
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null)
   const [enrollError, setEnrollError] = useState<string | null>(null)
-  const [formData, setFormData] = useState({ username: "", email: "", role: "student" as const })
+  const [formData, setFormData] = useState({ username: "", email: "", role: "student" as const, password: "" })
   const [formError, setFormError] = useState("")
   const [editingUserId, setEditingUserId] = useState<string | null>(null)
 
@@ -48,10 +49,29 @@ export default function UsersPage() {
       return
     }
 
+    // require password when creating new user; for edits empty password means keep existing
+    if (!editingUserId && !formData.password) {
+      setFormError("Please provide a password for the new user")
+      return
+    }
+
     // If editing, update existing user
     if (editingUserId) {
-      // check uniqueness excluding the user being edited
+      // check username uniqueness excluding the user being edited
       const exists = users.find((u) => u.id !== editingUserId && u.username.toLowerCase() === uname.toLowerCase())
+      if (exists) {
+        setFormError("This username is already taken. Choose a different username.")
+        return
+      }
+
+      // if password is provided on edit, ensure it's unique across other users
+      if (formData.password) {
+        const passDup = users.find((u) => u.id !== editingUserId && u.password && u.password === formData.password)
+        if (passDup) {
+          setFormError("This password is already used by another account. Choose a different password.")
+          return
+        }
+      }
       if (exists) {
         setFormError("This username is already taken. Choose a different username.")
         return
@@ -59,7 +79,13 @@ export default function UsersPage() {
 
       const next = users.map((u) =>
         u.id === editingUserId
-          ? { ...u, username: uname, email: formData.email.trim(), role: formData.role }
+          ? {
+              ...u,
+              username: uname,
+              email: formData.email.trim(),
+              role: formData.role,
+              password: formData.password ? formData.password : u.password,
+            }
           : u
       )
       setUsers(next)
@@ -87,12 +113,26 @@ export default function UsersPage() {
       return
     }
 
+    // ensure password is provided
+    if (!formData.password) {
+      setFormError("Please provide a password for this user.")
+      return
+    }
+
+    // ensure password uniqueness across all existing users
+    const passConflict = users.find((u) => u.password && u.password === formData.password)
+    if (passConflict) {
+      setFormError("This password is already used by another account. Choose a different password.")
+      return
+    }
+
     const newUser: User = {
       id: String(users.length + 1),
       username: uname,
       email: formData.email.trim(),
       role: formData.role,
       status: "active",
+      password: formData.password,
     }
     const next = [...users, newUser]
     setUsers(next)
@@ -112,7 +152,7 @@ export default function UsersPage() {
     } catch (e) {
       console.error(e)
     }
-    setFormData({ username: "", email: "", role: "student" })
+    setFormData({ username: "", email: "", role: "student", password: "" })
     setFormError("")
     setShowModal(false)
   }
@@ -121,7 +161,7 @@ export default function UsersPage() {
     const u = users.find((x) => x.id === id)
     if (!u) return
     setEditingUserId(id)
-    setFormData({ username: u.username, email: u.email, role: u.role })
+    setFormData({ username: u.username, email: u.email, role: u.role, password: "" })
     setFormError("")
     setShowModal(true)
   }
@@ -272,6 +312,17 @@ export default function UsersPage() {
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   className="w-full px-3 py-2 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary bg-background text-foreground"
                   placeholder="email@example.com"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2 text-foreground">Password</label>
+                <input
+                  type="password"
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  className="w-full px-3 py-2 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary bg-background text-foreground"
+                  placeholder={editingUserId ? "Leave empty to keep current password" : "Set a password"}
                 />
               </div>
 

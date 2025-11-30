@@ -7,6 +7,7 @@ import { ChevronRight, BookOpen, Sparkles } from "lucide-react"
 export default function LoginPage() {
   const router = useRouter()
   const [username, setUsername] = useState("")
+  const [password, setPassword] = useState("")
   const [role, setRole] = useState("student")
   const [error, setError] = useState("")
   const [isLoading, setIsLoading] = useState(false)
@@ -18,6 +19,11 @@ export default function LoginPage() {
       return
     }
 
+    if (!password) {
+      setError("Please enter a password")
+      return
+    }
+
     // Enforce globally unique usernames across all roles (case-insensitive)
     const uname = username.trim()
     setIsLoading(true)
@@ -25,20 +31,45 @@ export default function LoginPage() {
     setTimeout(() => {
       try {
         const raw = localStorage.getItem("users")
-        const users: Array<{ username: string; role: string }> = raw ? JSON.parse(raw) : []
+        // users may be created by admin (with id, email, status) or by sign-in (previous format).
+        const users: any[] = raw ? JSON.parse(raw) : []
 
-        const existing = users.find((u) => u.username.toLowerCase() === uname.toLowerCase())
+        const existing = users.find((u) => (u.username || "").toLowerCase() === uname.toLowerCase())
 
         if (existing) {
+          // username exists
           if (existing.role !== role) {
             setError("This username is already taken by another role. Please choose a different username.")
             setIsLoading(false)
             return
           }
-          // existing user with same role -> allow login
+
+          // If the existing account has a password, validate it
+          if (existing.password !== undefined) {
+            if (existing.password !== password) {
+              setError("Incorrect password for this account")
+              setIsLoading(false)
+              return
+            }
+            // password matched -> allow login
+          } else {
+            // account has no password set (likely created from admin UI) - require admin to set password
+            setError("This account does not have a password set. Please contact your administrator or create a new account.")
+            setIsLoading(false)
+            return
+          }
         } else {
-          // create new user and persist
-          users.push({ username: uname, role })
+          // Ensure this password isn't already used by another account
+          const passConflict = users.find((u) => u.password && u.password === password)
+          if (passConflict) {
+            setError("This password is already used by another account. Please choose a different password.")
+            setIsLoading(false)
+            return
+          }
+
+          // create new user and persist (store password)
+          const newUser = { id: String(users.length + 1), username: uname, email: "", role, status: "active", password }
+          users.push(newUser)
           localStorage.setItem("users", JSON.stringify(users))
         }
 
@@ -135,6 +166,21 @@ export default function LoginPage() {
                   setError("")
                 }}
                 placeholder="Enter your username"
+                className="w-full px-4 py-3 bg-input border border-border rounded-lg focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all placeholder:text-muted-foreground"
+              />
+            </div>
+
+            {/* Password Input */}
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-foreground">Password</label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => {
+                  setPassword(e.target.value)
+                  setError("")
+                }}
+                placeholder="Enter your password"
                 className="w-full px-4 py-3 bg-input border border-border rounded-lg focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all placeholder:text-muted-foreground"
               />
             </div>
