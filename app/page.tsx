@@ -4,6 +4,8 @@ import { useState, useRef, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { ChevronRight, BookOpen, Sparkles } from "lucide-react"
 import { hashPassword, migrateStoredPasswords, looksHashed } from "@/lib/auth"
+import { toast } from "@/hooks/use-toast"
+import { useRef } from "react"
 
 export default function LoginPage() {
   const router = useRouter()
@@ -20,6 +22,8 @@ export default function LoginPage() {
   const [confirmPassword, setConfirmPassword] = useState("")
   const [setPwError, setSetPwError] = useState("")
   const [isSetting, setIsSetting] = useState(false)
+  const setPwRef = useRef<HTMLDivElement | null>(null)
+  const newPwRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
     migrateStoredPasswords().catch(() => {})
@@ -182,6 +186,13 @@ export default function LoginPage() {
       window.dispatchEvent(new Event("activities-updated"))
       const sess = { username: users[targetIndex].username, role: users[targetIndex].role }
       localStorage.setItem("user", JSON.stringify(sess))
+      // show success toast
+      try {
+        toast({ title: "Password set", description: "Your password has been saved and you're now signed in." })
+      } catch (e) {
+        /* ignore */
+      }
+
       setShowSetPwModal(false)
       setIsSetting(false)
       router.push(users[targetIndex].role === "admin" ? "/admin/dashboard" : users[targetIndex].role === "teacher" ? "/teacher/dashboard" : "/student/dashboard")
@@ -211,6 +222,47 @@ export default function LoginPage() {
       setExistingUser(null)
     }
   }, [username, role])
+
+  // focus trap and focus management for Set Password modal
+  useEffect(() => {
+    if (!showSetPwModal) return
+    // focus first input
+    setTimeout(() => {
+      try {
+        newPwRef.current?.focus()
+      } catch (e) {
+        /* ignore */
+      }
+    }, 10)
+
+    const root = setPwRef.current
+    if (!root) return
+
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab') return
+      const focusable = root.querySelectorAll<HTMLElement>(
+        'a[href], button, textarea, input, select, [tabindex]:not([tabindex="-1"])'
+      )
+      if (!focusable || focusable.length === 0) return
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+
+      if (e.shiftKey) {
+        if (document.activeElement === first) {
+          e.preventDefault()
+          last.focus()
+        }
+      } else {
+        if (document.activeElement === last) {
+          e.preventDefault()
+          first.focus()
+        }
+      }
+    }
+
+    document.addEventListener('keydown', handleKey)
+    return () => document.removeEventListener('keydown', handleKey)
+  }, [showSetPwModal])
 
   const roles = [
     { id: "admin", label: "Admin", icon: "⚙️", description: "Manage system" },
@@ -390,6 +442,7 @@ export default function LoginPage() {
                         e.preventDefault()
                         await handleSetPassword()
                       }}
+                      ref={setPwRef}
                       className="relative z-10 w-full max-w-md p-6 bg-white rounded-lg shadow-lg"
                     >
                       <h3 className="text-lg font-bold mb-3 text-foreground">Set a password for your account</h3>
@@ -399,6 +452,7 @@ export default function LoginPage() {
                         <div>
                           <label className="block text-sm font-medium mb-1">New password</label>
                           <input
+                            ref={newPwRef}
                             type="password"
                             value={newPassword}
                             onChange={(e) => {
