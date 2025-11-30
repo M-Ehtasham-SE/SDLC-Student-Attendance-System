@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation"
 import { ChevronRight, BookOpen, Sparkles } from "lucide-react"
 import { hashPassword, migrateStoredPasswords, looksHashed } from "@/lib/auth"
 import { toast } from "@/hooks/use-toast"
-import { useRef } from "react"
 
 export default function LoginPage() {
   const router = useRouter()
