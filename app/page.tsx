@@ -1,8 +1,9 @@
 "use client"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { ChevronRight, BookOpen, Sparkles } from "lucide-react"
+import { hashPassword, migrateStoredPasswords, looksHashed } from "@/lib/auth"
 
 export default function LoginPage() {
   const router = useRouter()
@@ -12,8 +13,24 @@ export default function LoginPage() {
   const [error, setError] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const usernameRef = useRef<HTMLInputElement | null>(null)
+  const [showPw, setShowPw] = useState(false)
 
-  const handleLogin = () => {
+  useEffect(() => {
+    migrateStoredPasswords().catch(() => {})
+  }, [])
+
+  const checkStrength = (pw: string) => {
+    let score = 0
+    if (pw.length >= 8) score++
+    if (/[a-z]/.test(pw)) score++
+    if (/[A-Z]/.test(pw)) score++
+    if (/[0-9]/.test(pw)) score++
+    if (/[^A-Za-z0-9]/.test(pw)) score++
+    const label = score <= 2 ? "Weak" : score === 3 ? "Medium" : "Strong"
+    return { score, label }
+  }
+
+  const handleLogin = async () => {
     if (!username.trim()) {
       setError("Please enter a username")
       return
@@ -27,16 +44,15 @@ export default function LoginPage() {
     // Enforce globally unique usernames across all roles (case-insensitive)
     const uname = username.trim()
     setIsLoading(true)
+    try {
+      await migrateStoredPasswords()
+      const raw = localStorage.getItem("users")
+      // users may be created by admin (with id, email, status) or by sign-in (previous format).
+      const users: any[] = raw ? JSON.parse(raw) : []
 
-    setTimeout(() => {
-      try {
-        const raw = localStorage.getItem("users")
-        // users may be created by admin (with id, email, status) or by sign-in (previous format).
-        const users: any[] = raw ? JSON.parse(raw) : []
+      const existing = users.find((u) => (u.username || "").toLowerCase() === uname.toLowerCase())
 
-        const existing = users.find((u) => (u.username || "").toLowerCase() === uname.toLowerCase())
-
-        if (existing) {
+      if (existing) {
           // username exists
           if (existing.role !== role) {
             setError("This username is already taken by another role. Please choose a different username.")
@@ -46,7 +62,9 @@ export default function LoginPage() {
 
           // If the existing account has a password, validate it
           if (existing.password !== undefined) {
-            if (existing.password !== password) {
+            // compare hashed values
+            const hashedInput = looksHashed(existing.password) ? await hashPassword(password) : password
+            if (existing.password !== hashedInput) {
               setError("Incorrect password for this account")
               setIsLoading(false)
               return
@@ -59,36 +77,43 @@ export default function LoginPage() {
             return
           }
         } else {
-          // Ensure this password isn't already used by another account
-          const passConflict = users.find((u) => u.password && u.password === password)
+          // Ensure this password isn't already used by another account (compare hashed)
+          const hashedPw = await hashPassword(password)
+          const passConflict = users.find((u) => u.password && u.password === hashedPw)
           if (passConflict) {
             setError("This password is already used by another account. Please choose a different password.")
             setIsLoading(false)
             return
           }
 
+          // require strong password
+          const st = checkStrength(password)
+          if (st.score < 4) {
+            setError("Password too weak — use 8+ chars, mix upper/lower, a digit and a symbol")
+            setIsLoading(false)
+            return
+          }
+
           // create new user and persist (store password)
-          const newUser = { id: String(users.length + 1), username: uname, email: "", role, status: "active", password }
+          const newUser = { id: String(users.length + 1), username: uname, email: "", role, status: "active", password: hashedPw }
           users.push(newUser)
           localStorage.setItem("users", JSON.stringify(users))
         }
+      const user = { username: uname, role }
+      localStorage.setItem("user", JSON.stringify(user))
 
-        const user = { username: uname, role }
-        localStorage.setItem("user", JSON.stringify(user))
-
-        if (role === "admin") {
-          router.push("/admin/dashboard")
-        } else if (role === "teacher") {
-          router.push("/teacher/dashboard")
-        } else {
-          router.push("/student/dashboard")
-        }
-      } catch (err) {
-        setError("An error occurred while signing in. Please try again.")
-        setIsLoading(false)
-        console.error(err)
+      if (role === "admin") {
+        router.push("/admin/dashboard")
+      } else if (role === "teacher") {
+        router.push("/teacher/dashboard")
+      } else {
+        router.push("/student/dashboard")
       }
-    }, 500)
+    } catch (err) {
+      setError("An error occurred while signing in. Please try again.")
+      setIsLoading(false)
+      console.error(err)
+    }
   }
 
   const handleSignInClick = () => {
@@ -173,16 +198,43 @@ export default function LoginPage() {
             {/* Password Input */}
             <div className="space-y-2">
               <label className="text-sm font-semibold text-foreground">Password</label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => {
-                  setPassword(e.target.value)
-                  setError("")
-                }}
-                placeholder="Enter your password"
-                className="w-full px-4 py-3 bg-input border border-border rounded-lg focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all placeholder:text-muted-foreground"
-              />
+              <div className="relative">
+                <input
+                  type={showPw ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => {
+                    setPassword(e.target.value)
+                    setError("")
+                  }}
+                  placeholder="Enter your password"
+                  className="w-full px-4 py-3 bg-input border border-border rounded-lg focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all placeholder:text-muted-foreground"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPw((s) => !s)}
+                  className="absolute right-2 top-2 text-sm text-muted-foreground px-2 py-1 rounded"
+                >
+                  {showPw ? "Hide" : "Show"}
+                </button>
+              </div>
+              {/* strength */}
+              {password.length > 0 && (
+                (() => {
+                  const st = checkStrength(password)
+                  const pct = Math.min(100, (st.score / 5) * 100)
+                  const color = st.label === "Weak" ? "bg-red-500" : st.label === "Medium" ? "bg-yellow-400" : "bg-emerald-500"
+                  return (
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <div className="flex-1 mr-3 h-2 bg-gray-100 rounded-full overflow-hidden">
+                        <div style={{ width: `${pct}%` }} className={`${color} h-2 rounded-full`} />
+                      </div>
+                      <div className={`font-semibold ${st.label === "Weak" ? "text-red-600" : st.label === "Medium" ? "text-yellow-600" : "text-emerald-600"}`}>
+                        {st.label}
+                      </div>
+                    </div>
+                  )
+                })()
+              )}
             </div>
 
             {/* Role Selection */}

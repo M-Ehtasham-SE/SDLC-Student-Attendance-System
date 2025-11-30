@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { hashPassword, migrateStoredPasswords, looksHashed } from "@/lib/auth"
 import { Card } from "@/components/ui/card"
 
 interface User {
@@ -35,10 +36,25 @@ export default function UsersPage() {
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null)
   const [enrollError, setEnrollError] = useState<string | null>(null)
   const [formData, setFormData] = useState({ username: "", email: "", role: "student" as const, password: "" })
+  const [showPassword, setShowPassword] = useState(false)
+
+  useEffect(() => {
+    // ensure stored passwords are hashed and refresh state
+    const migrate = async () => {
+      await migrateStoredPasswords()
+      try {
+        const raw = localStorage.getItem("users")
+        if (raw) setUsers(JSON.parse(raw))
+      } catch (e) {
+        console.error(e)
+      }
+    }
+    migrate().catch(() => {})
+  }, [])
   const [formError, setFormError] = useState("")
   const [editingUserId, setEditingUserId] = useState<string | null>(null)
 
-  const handleAddUser = () => {
+  const handleAddUser = async () => {
     const uname = formData.username.trim()
     if (!uname) {
       setFormError("Please enter a username")
@@ -64,9 +80,25 @@ export default function UsersPage() {
         return
       }
 
-      // if password is provided on edit, ensure it's unique across other users
+      // if password is provided on edit, ensure it's unique across other users and hash it
+      let hashedForEdit: string | undefined = undefined
       if (formData.password) {
-        const passDup = users.find((u) => u.id !== editingUserId && u.password && u.password === formData.password)
+        // strength
+        const st = (() => {
+          let score = 0
+          if ((formData.password || "").length >= 8) score++
+          if (/[a-z]/.test(formData.password)) score++
+          if (/[A-Z]/.test(formData.password)) score++
+          if (/[0-9]/.test(formData.password)) score++
+          if (/[^A-Za-z0-9]/.test(formData.password)) score++
+          return score
+        })()
+        if (st < 4) {
+          setFormError("Password too weak — use 8+ chars, mix upper/lower, a digit and a symbol")
+          return
+        }
+        hashedForEdit = await hashPassword(formData.password)
+        const passDup = users.find((u) => u.id !== editingUserId && u.password && u.password === hashedForEdit)
         if (passDup) {
           setFormError("This password is already used by another account. Choose a different password.")
           return
@@ -79,12 +111,12 @@ export default function UsersPage() {
 
       const next = users.map((u) =>
         u.id === editingUserId
-          ? {
+            : {
               ...u,
               username: uname,
               email: formData.email.trim(),
               role: formData.role,
-              password: formData.password ? formData.password : u.password,
+              password: hashedForEdit ? hashedForEdit : u.password,
             }
           : u
       )
@@ -99,7 +131,7 @@ export default function UsersPage() {
       } catch (e) {
         console.error(e)
       }
-      setFormData({ username: "", email: "", role: "student" })
+      setFormData({ username: "", email: "", role: "student", password: "" })
       setFormError("")
       setEditingUserId(null)
       setShowModal(false)
@@ -119,8 +151,24 @@ export default function UsersPage() {
       return
     }
 
-    // ensure password uniqueness across all existing users
-    const passConflict = users.find((u) => u.password && u.password === formData.password)
+    // strength check
+    const st = (() => {
+      let score = 0
+      if ((formData.password || "").length >= 8) score++
+      if (/[a-z]/.test(formData.password)) score++
+      if (/[A-Z]/.test(formData.password)) score++
+      if (/[0-9]/.test(formData.password)) score++
+      if (/[^A-Za-z0-9]/.test(formData.password)) score++
+      return score
+    })()
+    if (st < 4) {
+      setFormError("Password too weak — use 8+ chars, mix upper/lower, a digit and a symbol")
+      return
+    }
+
+    // hash and enforce uniqueness
+    const newHashed = await hashPassword(formData.password)
+    const passConflict = users.find((u) => u.password && u.password === newHashed)
     if (passConflict) {
       setFormError("This password is already used by another account. Choose a different password.")
       return
@@ -132,7 +180,7 @@ export default function UsersPage() {
       email: formData.email.trim(),
       role: formData.role,
       status: "active",
-      password: formData.password,
+      password: newHashed,
     }
     const next = [...users, newUser]
     setUsers(next)
@@ -200,7 +248,7 @@ export default function UsersPage() {
         <button
           onClick={() => {
             setEditingUserId(null)
-            setFormData({ username: "", email: "", role: "student" })
+            setFormData({ username: "", email: "", role: "student", password: "" })
             setFormError("")
             setShowModal(true)
           }}
@@ -317,13 +365,45 @@ export default function UsersPage() {
 
               <div>
                 <label className="block text-sm font-medium mb-2 text-foreground">Password</label>
-                <input
-                  type="password"
-                  value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  className="w-full px-3 py-2 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary bg-background text-foreground"
-                  placeholder={editingUserId ? "Leave empty to keep current password" : "Set a password"}
-                />
+                <div className="relative">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    value={formData.password}
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    className="w-full px-3 py-2 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary bg-background text-foreground"
+                    placeholder={editingUserId ? "Leave empty to keep current password" : "Set a password"}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((s) => !s)}
+                    className="absolute right-2 top-2 text-sm text-muted-foreground px-2 py-1 rounded"
+                  >
+                    {showPassword ? "Hide" : "Show"}
+                  </button>
+                </div>
+                {formData.password && (
+                  (() => {
+                    let score = 0
+                    if ((formData.password || "").length >= 8) score++
+                    if (/[a-z]/.test(formData.password)) score++
+                    if (/[A-Z]/.test(formData.password)) score++
+                    if (/[0-9]/.test(formData.password)) score++
+                    if (/[^A-Za-z0-9]/.test(formData.password)) score++
+                    const label = score <= 2 ? "Weak" : score === 3 ? "Medium" : "Strong"
+                    const pct = Math.min(100, (score / 5) * 100)
+                    const color = label === "Weak" ? "bg-red-500" : label === "Medium" ? "bg-yellow-400" : "bg-emerald-500"
+                    return (
+                      <div className="flex items-center justify-between text-xs text-muted-foreground mt-2">
+                        <div className="flex-1 mr-3 h-2 bg-gray-100 rounded-full overflow-hidden">
+                          <div style={{ width: `${pct}%` }} className={`${color} h-2 rounded-full`} />
+                        </div>
+                        <div className={`font-semibold ${label === "Weak" ? "text-red-600" : label === "Medium" ? "text-yellow-600" : "text-emerald-600"}`}>
+                          {label}
+                        </div>
+                      </div>
+                    )
+                  })()
+                )}
               </div>
 
               {formError && <div className="text-sm text-red-600">{formError}</div>}
