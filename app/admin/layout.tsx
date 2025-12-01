@@ -22,6 +22,19 @@ export default function AdminLayout({
       router.push("/")
       return
     }
+
+    try {
+      const rawActive = localStorage.getItem("activeAdmin")
+      const active = rawActive ? JSON.parse(rawActive) : null
+      if (active && String(active.username).toLowerCase() !== String(currentUser.username).toLowerCase()) {
+        // another admin currently holds admin access, block entry
+        // (redirect to home — only the active admin may access admin pages)
+        router.push("/")
+        return
+      }
+    } catch (e) {
+      // ignore any activeAdmin parsing errors and allow entry
+    }
     setUser(currentUser)
     setLoading(false)
   }, [router])

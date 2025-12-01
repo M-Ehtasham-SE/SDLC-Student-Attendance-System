@@ -109,13 +109,52 @@ export default function LoginPage() {
           localStorage.setItem("users", JSON.stringify(users))
         }
       const user = { username: uname, role }
-      localStorage.setItem("user", JSON.stringify(user))
 
+      // ADMIN ACCESS CONTROL: only one active admin allowed at a time
       if (String(role).toLowerCase() === "admin") {
-        router.push("/admin/dashboard")
+        try {
+          const rawActive = localStorage.getItem("activeAdmin")
+          const active = rawActive ? JSON.parse(rawActive) : null
+          // if an active admin exists and is not this username, block admin sign in
+          if (active && String(active.username).toLowerCase() !== uname.toLowerCase()) {
+            setError(`Admin portal reserved for '${active.username}'. Request transfer via Manage Users.`)
+            setIsLoading(false)
+            return
+          }
+
+          // no active admin assigned -> claim active admin for this account
+          if (!active) {
+            const rawUsers = localStorage.getItem("users")
+            const all = rawUsers ? JSON.parse(rawUsers) : []
+            const matched = all.find((u: any) => (u.username || "").toLowerCase() === uname.toLowerCase() && String(u.role).toLowerCase() === "admin")
+            const adminId = matched ? matched.id : null
+            const newActive = { id: adminId, username: uname, setAt: Date.now() }
+            try {
+              localStorage.setItem("activeAdmin", JSON.stringify(newActive))
+              // log this action
+              const rawActs = localStorage.getItem("activities")
+              const acts = rawActs ? JSON.parse(rawActs) : []
+              acts.push({ actor: uname, action: "become-active-admin", adminId, timestamp: Date.now() })
+              localStorage.setItem("activities", JSON.stringify(acts))
+              try { window.dispatchEvent(new Event("activities-updated")) } catch(e){}
+            } catch(e) {
+              console.error("Failed to set activeAdmin during login", e)
+            }
+          }
+
+          // persist session only after admin active checks succeed
+          localStorage.setItem("user", JSON.stringify(user))
+          router.push("/admin/dashboard")
+        } catch (e) {
+          // fallback: allow admin access if there is an error reading active admin
+          localStorage.setItem("user", JSON.stringify(user))
+          router.push("/admin/dashboard")
+        }
       } else if (String(role).toLowerCase() === "teacher") {
+        localStorage.setItem("user", JSON.stringify(user))
         router.push("/teacher/dashboard")
       } else {
+        localStorage.setItem("user", JSON.stringify(user))
         router.push("/student/dashboard")
       }
     } catch (err) {
@@ -184,6 +223,32 @@ export default function LoginPage() {
       // dispatch and auto-login
       window.dispatchEvent(new Event("activities-updated"))
       const sess = { username: users[targetIndex].username, role: users[targetIndex].role }
+      // If this is an admin account being set, ensure activeAdmin exists or is set to this user
+      try {
+        if (String(users[targetIndex].role).toLowerCase() === "admin") {
+          const rawActive = localStorage.getItem("activeAdmin")
+          const active = rawActive ? JSON.parse(rawActive) : null
+          if (active && String(active.username).toLowerCase() !== String(users[targetIndex].username).toLowerCase()) {
+            // active admin exists and is different -> block admin auto-entry
+            setError(`Admin portal reserved for '${active.username}'. Request transfer via Manage Users.`)
+            setIsSetting(false)
+            return
+          }
+          if (!active) {
+            const adminId = users[targetIndex].id
+            const newActive = { id: adminId, username: users[targetIndex].username, setAt: Date.now() }
+            localStorage.setItem("activeAdmin", JSON.stringify(newActive))
+            const rawActs = localStorage.getItem("activities")
+            const acts = rawActs ? JSON.parse(rawActs) : []
+            acts.push({ actor: users[targetIndex].username, action: "become-active-admin", adminId, timestamp: Date.now() })
+            localStorage.setItem("activities", JSON.stringify(acts))
+            try { window.dispatchEvent(new Event("activities-updated")) } catch (e) {}
+          }
+        }
+      } catch (e) {
+        console.error("active admin check failed in set-password flow", e)
+      }
+      // persist session only after admin checks completed
       localStorage.setItem("user", JSON.stringify(sess))
       // show success toast
       try {
