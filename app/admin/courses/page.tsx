@@ -451,7 +451,13 @@ export default function CoursesPage() {
                               // remove locally so UI updates
                               setStudentsForCourse((prev) => prev.filter((x) => String(x.id) !== String(s.id)))
 
-                              // helper now logs activity and dispatches events (activities-updated/enrollment-updated/courses-updated)
+                              // helper logs activities and dispatches events — ensure listeners get notified too
+                              try {
+                                window.dispatchEvent(new Event("enrollment-updated"))
+                                window.dispatchEvent(new Event("activities-updated"))
+                              } catch (e) {
+                                /* ignore in non-browser env */
+                              }
                               // enrollment-updated is dispatched inside the helper; courses-updated also dispatched there
                             } else {
                               alert("No enrollment found to remove")

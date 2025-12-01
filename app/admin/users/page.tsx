@@ -370,6 +370,12 @@ export default function UsersPage() {
                                           const removed = removeEnrollment(r.id, r.courseId)
                                           if (removed) {
                                             removedAny = true
+                                            try {
+                                              window.dispatchEvent(new Event("enrollment-updated"))
+                                              window.dispatchEvent(new Event("activities-updated"))
+                                            } catch (e) {
+                                              // ignore in non-browser env
+                                            }
                                           }
                                         }
 
