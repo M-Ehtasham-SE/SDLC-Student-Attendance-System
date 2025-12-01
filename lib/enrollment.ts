@@ -45,6 +45,9 @@ export function removeEnrollment(studentId: string | number, courseId: string | 
 
     // persist the new enrolled list
     setEnrolledStudents(filtered)
+    // gather removed records for activity logging and to compute how many were removed
+    const removedRecords = arr.filter((r) => String(r.id) === idS && String(r.courseId) === courseS)
+
     // persist course counts as well (if the removed records affected the requested course)
     try {
       const removedCount = arr.length - filtered.length
@@ -58,6 +61,29 @@ export function removeEnrollment(studentId: string | number, courseId: string | 
           localStorage.setItem("courses", JSON.stringify(nextCourses))
         } catch (e) {
           console.error("Failed to persist updated courses after unenroll", e)
+        }
+      }
+      // add activity entries for removed records
+      if (removedRecords.length > 0) {
+        try {
+          const rawUser = localStorage.getItem("user")
+          const actorObj = rawUser ? JSON.parse(rawUser) : null
+          const actor = actorObj ? actorObj.username || actorObj.name || JSON.stringify(actorObj) : "(system)"
+
+          const rawActs = localStorage.getItem("activities")
+          const acts = rawActs ? JSON.parse(rawActs) : []
+          for (const rec of removedRecords) {
+            acts.push({ actor, action: "unenroll", studentId: rec.id, courseId: rec.courseId, timestamp: Date.now() })
+          }
+          localStorage.setItem("activities", JSON.stringify(acts))
+          // notify listeners that activities changed
+          try {
+            window.dispatchEvent(new Event("activities-updated"))
+          } catch (e) {
+            /* ignore in non-browser */
+          }
+        } catch (e) {
+          console.error("Failed to log unenroll activities", e)
         }
       }
     } catch (e) {

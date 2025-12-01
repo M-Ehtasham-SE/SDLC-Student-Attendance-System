@@ -451,17 +451,7 @@ export default function CoursesPage() {
                               // remove locally so UI updates
                               setStudentsForCourse((prev) => prev.filter((x) => String(x.id) !== String(s.id)))
 
-                              // record activity
-                              try {
-                                const rawAct = localStorage.getItem("activities")
-                                const acts = rawAct ? JSON.parse(rawAct) : []
-                                acts.push({ action: `Unenrolled ${s.username || s.name} (id:${s.id}) from course:${studentsModalCourse}`, timestamp: Date.now() })
-                                localStorage.setItem("activities", JSON.stringify(acts))
-                              } catch (e) {
-                                console.error(e)
-                              }
-
-                              window.dispatchEvent(new Event("activities-updated"))
+                              // helper now logs activity and dispatches events (activities-updated/enrollment-updated/courses-updated)
                               // enrollment-updated is dispatched inside the helper; courses-updated also dispatched there
                             } else {
                               alert("No enrollment found to remove")

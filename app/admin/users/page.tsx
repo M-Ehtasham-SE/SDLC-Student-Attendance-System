@@ -374,17 +374,7 @@ export default function UsersPage() {
                                         }
 
                                         if (removedAny) {
-                                          try {
-                                            const rawAct = localStorage.getItem("activities")
-                                            const acts = rawAct ? JSON.parse(rawAct) : []
-                                            acts.push({ action: `Unenrolled ${user.username} (id:${user.id}) from ${toRemove.map((t: any) => t.courseName).join(", ")}`, timestamp: Date.now() })
-                                            localStorage.setItem("activities", JSON.stringify(acts))
-                                            window.dispatchEvent(new Event("activities-updated"))
-                                          } catch (e) {
-                                            console.error(e)
-                                          }
-
-                                          // helper dispatched enrollment-updated and courses-updated already
+                                          // helper dispatched enrollment-updated, courses-updated and logs activities already
                                           // re-read courses so UI reflects updated counts
                                           try {
                                             const rawCourses2 = localStorage.getItem("courses")
