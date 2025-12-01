@@ -27,6 +27,9 @@ export default function CoursesPage() {
   const [showModal, setShowModal] = useState(false)
   const [formData, setFormData] = useState({ name: "", code: "", teacher: "" })
   const [editingCourseId, setEditingCourseId] = useState<string | null>(null)
+  const [showStudentsModal, setShowStudentsModal] = useState(false)
+  const [studentsForCourse, setStudentsForCourse] = useState<Array<{ id: string; name: string; username?: string }>>([])
+  const [studentsModalCourse, setStudentsModalCourse] = useState<string | null>(null)
   const [showAssignModal, setShowAssignModal] = useState(false)
   const [assigningCourseId, setAssigningCourseId] = useState<string | null>(null)
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null)
@@ -180,7 +183,29 @@ export default function CoursesPage() {
               </div>
             </div>
 
-            <div className="flex gap-2 pt-4 border-t border-border">
+              <div className="flex gap-2 pt-4 border-t border-border">
+                <button
+                  onClick={() => {
+                    // load students for this course from localStorage (UI placeholder)
+                    try {
+                      const raw = localStorage.getItem("enrolledStudents")
+                      const enrolled = raw ? JSON.parse(raw) : []
+                      const students = enrolled
+                        .filter((s: any) => String(s.courseId) === String(course.id))
+                        .map((s: any) => ({ id: s.id, name: s.name, username: s.username }))
+                      setStudentsForCourse(students)
+                      setStudentsModalCourse(course.id)
+                      setShowStudentsModal(true)
+                    } catch (e) {
+                      setStudentsForCourse([])
+                      setStudentsModalCourse(null)
+                      setShowStudentsModal(true)
+                    }
+                  }}
+                  className="px-3 py-2 text-sm bg-secondary/20 text-secondary hover:bg-secondary/30 rounded transition-all font-medium"
+                >
+                  Students
+                </button>
               <button
                 onClick={() => {
                   setAssigningCourseId(course.id)
@@ -384,6 +409,40 @@ export default function CoursesPage() {
                 Assign
               </button>
             </div>
+          </Card>
+        </div>
+      )}
+      {showStudentsModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <Card className="w-full max-w-2xl p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-2xl font-bold">Enrolled Students{studentsModalCourse ? ` — Course ${studentsModalCourse}` : ''}</h2>
+              <button onClick={() => setShowStudentsModal(false)} className="text-xl text-slate-500 hover:text-slate-700">✕</button>
+            </div>
+
+            {studentsForCourse.length === 0 ? (
+              <p className="text-slate-600">No students enrolled in this course.</p>
+            ) : (
+              <div className="space-y-2 max-h-80 overflow-y-auto">
+                {studentsForCourse.map((s) => (
+                  <div key={s.id} className="flex items-center justify-between p-3 border border-slate-200 rounded-lg">
+                    <div>
+                      <p className="font-medium text-slate-900">{s.name}</p>
+                      <p className="text-sm text-slate-500">{s.username}</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => alert("Unenroll placeholder — no logic implemented yet")}
+                        className="px-3 py-1 text-sm bg-warning/20 text-warning hover:bg-warning/30 rounded transition-all"
+                      >
+                        Unenroll
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </Card>
         </div>
       )}

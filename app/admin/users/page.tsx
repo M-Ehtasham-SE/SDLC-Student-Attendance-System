@@ -111,7 +111,7 @@ export default function UsersPage() {
 
       const next = users.map((u) =>
         u.id === editingUserId
-            : {
+          ? {
               ...u,
               username: uname,
               email: formData.email.trim(),
@@ -323,6 +323,30 @@ export default function UsersPage() {
                       >
                         Enroll
                       </button>
+                    )}
+                    {user.role === "student" && (
+                      (() => {
+                        // check if this user is enrolled anywhere
+                        try {
+                          const raw = localStorage.getItem("enrolledStudents")
+                          const enrolled = raw ? JSON.parse(raw) : []
+                          const isEnrolled = enrolled.some((e: any) => String(e.id) === String(user.id))
+                          if (isEnrolled) {
+                            return (
+                              <button
+                                type="button"
+                                onClick={() => alert("Unenroll placeholder — UI only (no logic implemented yet)")}
+                                className="px-3 py-1 text-sm bg-warning/20 text-warning hover:bg-warning/30 rounded transition-all"
+                              >
+                                Unenroll
+                              </button>
+                            )
+                          }
+                        } catch (e) {
+                          // ignore
+                        }
+                        return null
+                      })()
                     )}
                   </td>
                 </tr>
