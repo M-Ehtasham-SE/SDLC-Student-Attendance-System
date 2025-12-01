@@ -18,7 +18,7 @@ export default function TeacherLayout({
 
   useEffect(() => {
     const currentUser = getUser()
-    if (!currentUser || currentUser.role !== "teacher") {
+    if (!currentUser || String(currentUser.role).toLowerCase() !== "teacher") {
       router.push("/")
       return
     }

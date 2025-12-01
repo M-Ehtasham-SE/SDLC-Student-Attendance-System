@@ -26,7 +26,7 @@ export default function StudentDashboard() {
         const list = raw ? (JSON.parse(raw) as EnrolledStudent[]) : []
         setEnrolled(list)
 
-        if (user && user.role === "student") {
+        if (user && String(user.role).toLowerCase() === "student") {
           // try to find the matching enrolled student by username or name heuristics
           const uname = (user.username || "").toLowerCase()
           const found = list.find((s) => (s.username && s.username === user.username) || s.id === user.username || s.name.toLowerCase() === uname || s.name.toLowerCase().includes(uname))
@@ -147,7 +147,7 @@ export default function StudentDashboard() {
           <p className="text-slate-600">Track your progress and achievements</p>
         </div>
 
-        {!user || user.role !== "student" ? (
+        {!user || String(user.role).toLowerCase() !== "student" ? (
           <div className="text-sm text-slate-600">Please sign in as a student to view personal data.</div>
         ) : !studentRecord ? (
           <div className="text-sm text-slate-600">No enrolled student record found for your account.</div>

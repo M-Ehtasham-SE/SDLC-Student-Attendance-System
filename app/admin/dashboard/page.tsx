@@ -14,8 +14,8 @@ export default function AdminDashboard() {
     try {
       const usersRaw = localStorage.getItem("users")
       const users = usersRaw ? (JSON.parse(usersRaw) as Array<{ username: string; role: string }>) : []
-      const students = users.filter((u) => u.role === "student").length
-      const teachers = users.filter((u) => u.role === "teacher").length
+      const students = users.filter((u) => String(u.role).toLowerCase() === "student").length
+      const teachers = users.filter((u) => String(u.role).toLowerCase() === "teacher").length
 
       const coursesRaw = localStorage.getItem("courses")
       const courses = coursesRaw ? (JSON.parse(coursesRaw) as Array<any>) : []

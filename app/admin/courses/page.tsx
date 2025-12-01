@@ -214,7 +214,7 @@ export default function CoursesPage() {
                   try {
                     const rawUsers = localStorage.getItem("users")
                     const users = rawUsers ? JSON.parse(rawUsers) : []
-                    const firstStudent = users.find((u: any) => u.role === "student")
+                    const firstStudent = users.find((u: any) => String(u.role).toLowerCase() === "student")
                     setSelectedStudentId(firstStudent ? String(firstStudent.id) : null)
                   } catch (e) {
                     setSelectedStudentId(null)
@@ -319,7 +319,7 @@ export default function CoursesPage() {
                     try {
                       const raw = localStorage.getItem("users")
                       const parsed = raw ? JSON.parse(raw) : []
-                      return parsed.filter((u: any) => u.role === "student").map((s: any) => (
+                      return parsed.filter((u: any) => String(u.role).toLowerCase() === "student").map((s: any) => (
                         <option key={s.id} value={s.id}>{s.username || s.email || s.id}</option>
                       ))
                     } catch (e) {
@@ -356,7 +356,7 @@ export default function CoursesPage() {
 
                     const userRaw = localStorage.getItem("users")
                     const users = userRaw ? JSON.parse(userRaw) : []
-                    const student = users.find((u: any) => String(u.id) === String(selectedStudentId) && u.role === "student")
+                    const student = users.find((u: any) => String(u.id) === String(selectedStudentId) && String(u.role).toLowerCase() === "student")
                     if (!student) {
                       setAssignError("Selected user is not a valid student")
                       return
@@ -439,17 +439,13 @@ export default function CoursesPage() {
                           try {
                             const removed = removeEnrollment(s.id, studentsModalCourse)
                             if (removed) {
-                              // decrement course students count
+                              // helper now updates course counts in localStorage; re-read to update UI state
                               try {
                                 const rawCourses = localStorage.getItem("courses")
                                 const parsedCourses = rawCourses ? JSON.parse(rawCourses) : []
-                                const nextCourses = parsedCourses.map((c: any) =>
-                                  String(c.id) === String(studentsModalCourse) ? { ...c, students: Math.max(0, Number(c.students || 0) - 1) } : c
-                                )
-                                localStorage.setItem("courses", JSON.stringify(nextCourses))
-                                setCourses(nextCourses)
+                                setCourses(parsedCourses)
                               } catch (e) {
-                                console.error(e)
+                                console.error("Failed to refresh courses after unenroll", e)
                               }
 
                               // remove locally so UI updates
@@ -466,7 +462,7 @@ export default function CoursesPage() {
                               }
 
                               window.dispatchEvent(new Event("activities-updated"))
-                              window.dispatchEvent(new Event("enrollment-updated"))
+                              // enrollment-updated is dispatched inside the helper; courses-updated also dispatched there
                             } else {
                               alert("No enrollment found to remove")
                             }

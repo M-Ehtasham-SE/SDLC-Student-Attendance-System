@@ -18,7 +18,7 @@ export default function AdminLayout({
 
   useEffect(() => {
     const currentUser = getUser()
-    if (!currentUser || currentUser.role !== "admin") {
+    if (!currentUser || String(currentUser.role).toLowerCase() !== "admin") {
       router.push("/")
       return
     }

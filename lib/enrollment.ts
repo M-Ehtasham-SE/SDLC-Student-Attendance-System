@@ -43,10 +43,32 @@ export function removeEnrollment(studentId: string | number, courseId: string | 
       return false
     }
 
-    localStorage.setItem("enrolledStudents", JSON.stringify(filtered))
+    // persist the new enrolled list
+    setEnrolledStudents(filtered)
+    // persist course counts as well (if the removed records affected the requested course)
+    try {
+      const removedCount = arr.length - filtered.length
+      if (removedCount > 0) {
+        const rawCourses = localStorage.getItem("courses")
+        const parsedCourses = rawCourses ? JSON.parse(rawCourses) : []
+        const nextCourses = parsedCourses.map((c: any) =>
+          String(c.id) === courseS ? { ...c, students: Math.max(0, Number(c.students || 0) - removedCount) } : c
+        )
+        try {
+          localStorage.setItem("courses", JSON.stringify(nextCourses))
+        } catch (e) {
+          console.error("Failed to persist updated courses after unenroll", e)
+        }
+      }
+    } catch (e) {
+      console.error("Failed to update course counts after removeEnrollment", e)
+    }
+
     // notify other parts of the app (same-tab for immediate updates)
     try {
       window.dispatchEvent(new Event("enrollment-updated"))
+      // also notify that courses changed so UI can refresh if desired
+      window.dispatchEvent(new Event("courses-updated"))
     } catch (e) {
       // ignore in non-browser environments
     }

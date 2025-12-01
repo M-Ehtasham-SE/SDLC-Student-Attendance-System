@@ -63,7 +63,7 @@ export default function LoginPage() {
 
       if (existing) {
           // username exists
-          if (existing.role !== role) {
+          if (String(existing.role).toLowerCase() !== String(role).toLowerCase()) {
             setError("This username is already taken by another role. Please choose a different username.")
             setIsLoading(false)
             return
@@ -111,9 +111,9 @@ export default function LoginPage() {
       const user = { username: uname, role }
       localStorage.setItem("user", JSON.stringify(user))
 
-      if (role === "admin") {
+      if (String(role).toLowerCase() === "admin") {
         router.push("/admin/dashboard")
-      } else if (role === "teacher") {
+      } else if (String(role).toLowerCase() === "teacher") {
         router.push("/teacher/dashboard")
       } else {
         router.push("/student/dashboard")
@@ -161,7 +161,7 @@ export default function LoginPage() {
       }
 
       // find the target user — prefer by id if available
-      const targetIndex = users.findIndex((u) => (u.username || "").toLowerCase() === (username || "").trim().toLowerCase() && u.role === role)
+      const targetIndex = users.findIndex((u) => (u.username || "").toLowerCase() === (username || "").trim().toLowerCase() && String(u.role).toLowerCase() === String(role).toLowerCase())
       if (targetIndex === -1) {
         setSetPwError("Account not found. Please check your username and role.")
         setIsSetting(false)
@@ -194,7 +194,7 @@ export default function LoginPage() {
 
       setShowSetPwModal(false)
       setIsSetting(false)
-      router.push(users[targetIndex].role === "admin" ? "/admin/dashboard" : users[targetIndex].role === "teacher" ? "/teacher/dashboard" : "/student/dashboard")
+      router.push(String(users[targetIndex].role).toLowerCase() === "admin" ? "/admin/dashboard" : String(users[targetIndex].role).toLowerCase() === "teacher" ? "/teacher/dashboard" : "/student/dashboard")
     } catch (e) {
       console.error(e)
       setSetPwError("Failed to set password — try again")
@@ -215,7 +215,7 @@ export default function LoginPage() {
     try {
       const raw = localStorage.getItem("users")
       const users: any[] = raw ? JSON.parse(raw) : []
-      const found = users.find((u) => (u.username || "").toLowerCase() === (username || "").trim().toLowerCase() && u.role === role)
+      const found = users.find((u) => (u.username || "").toLowerCase() === (username || "").trim().toLowerCase() && String(u.role).toLowerCase() === String(role).toLowerCase())
       setExistingUser(found || null)
     } catch (e) {
       setExistingUser(null)

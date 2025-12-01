@@ -306,7 +306,7 @@ export default function UsersPage() {
                     >
                       Delete
                     </button>
-                    {user.role === "student" && (
+                    {String(user.role).toLowerCase() === "student" && (
                       <button
                         onClick={() => {
                           setEnrollingUserId(user.id)
@@ -326,7 +326,7 @@ export default function UsersPage() {
                         Enroll
                       </button>
                     )}
-                    {user.role === "student" && (
+                    {String(user.role).toLowerCase() === "student" && (
                       (() => {
                         // check if this user is enrolled anywhere
                         try {
@@ -370,11 +370,6 @@ export default function UsersPage() {
                                           const removed = removeEnrollment(r.id, r.courseId)
                                           if (removed) {
                                             removedAny = true
-                                            // decrement course count if present
-                                            const nextCourses = parsedCourses.map((c: any) =>
-                                              String(c.id) === String(r.courseId) ? { ...c, students: Math.max(0, Number(c.students || 0) - 1) } : c
-                                            )
-                                            localStorage.setItem("courses", JSON.stringify(nextCourses))
                                           }
                                         }
 
@@ -389,8 +384,16 @@ export default function UsersPage() {
                                             console.error(e)
                                           }
 
-                                          // trigger same-tab update & re-render
-                                          window.dispatchEvent(new Event("enrollment-updated"))
+                                          // helper dispatched enrollment-updated and courses-updated already
+                                          // re-read courses so UI reflects updated counts
+                                          try {
+                                            const rawCourses2 = localStorage.getItem("courses")
+                                            const parsed2 = rawCourses2 ? JSON.parse(rawCourses2) : []
+                                            setCourses(parsed2)
+                                          } catch (e) {
+                                            console.error("Failed to refresh courses after unenroll all", e)
+                                          }
+                                          // trigger re-render for the users table
                                           setRefreshCounter((n) => n + 1)
                                         }
                                       } catch (err) {
