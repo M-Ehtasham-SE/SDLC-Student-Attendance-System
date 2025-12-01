@@ -21,7 +21,7 @@ export default function LoginPage() {
   const [confirmPassword, setConfirmPassword] = useState("")
   const [setPwError, setSetPwError] = useState("")
   const [isSetting, setIsSetting] = useState(false)
-  const setPwRef = useRef<HTMLDivElement | null>(null)
+  const setPwRef = useRef<HTMLFormElement | null>(null)
   const newPwRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {

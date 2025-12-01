@@ -37,7 +37,7 @@ export default function UsersPage() {
   const [enrollingUserId, setEnrollingUserId] = useState<string | null>(null)
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null)
   const [enrollError, setEnrollError] = useState<string | null>(null)
-  const [formData, setFormData] = useState({ username: "", email: "", role: "student" as const, password: "" })
+  const [formData, setFormData] = useState<{ username: string; email: string; role: "student" | "teacher" | "admin"; password: string }>({ username: "", email: "", role: "student", password: "" })
   const [showPassword, setShowPassword] = useState(false)
 
   useEffect(() => {
@@ -248,7 +248,7 @@ export default function UsersPage() {
     const u = users.find((x) => x.id === id)
     if (!u) return
     setEditingUserId(id)
-    setFormData({ username: u.username, email: u.email, role: u.role, password: "" })
+    setFormData({ username: u.username, email: u.email, role: u.role as "student" | "teacher" | "admin", password: "" })
     setFormError("")
     setShowModal(true)
   }
@@ -511,11 +511,11 @@ export default function UsersPage() {
 
                                         if (removedAny) {
                                           // helper dispatched enrollment-updated, courses-updated and logs activities already
-                                          // re-read courses so UI reflects updated counts
+                                          // re-read users so UI reflects updated enrollments
                                           try {
-                                            const rawCourses2 = localStorage.getItem("courses")
-                                            const parsed2 = rawCourses2 ? JSON.parse(rawCourses2) : []
-                                            setCourses(parsed2)
+                                            const rawUsers2 = localStorage.getItem("users")
+                                            const parsed2 = rawUsers2 ? JSON.parse(rawUsers2) : []
+                                            setUsers(parsed2)
                                           } catch (e) {
                                             console.error("Failed to refresh courses after unenroll all", e)
                                           }
