@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { hashPassword, migrateStoredPasswords, looksHashed } from "@/lib/auth"
 import { Card } from "@/components/ui/card"
+import { removeEnrollment } from "@/lib/enrollment"
 
 interface User {
   id: string
@@ -52,6 +53,7 @@ export default function UsersPage() {
     migrate().catch(() => {})
   }, [])
   const [formError, setFormError] = useState("")
+  const [refreshCounter, setRefreshCounter] = useState(0)
   const [editingUserId, setEditingUserId] = useState<string | null>(null)
 
   const handleAddUser = async () => {
@@ -330,17 +332,77 @@ export default function UsersPage() {
                         try {
                           const raw = localStorage.getItem("enrolledStudents")
                           const enrolled = raw ? JSON.parse(raw) : []
-                          const isEnrolled = enrolled.some((e: any) => String(e.id) === String(user.id))
-                          if (isEnrolled) {
-                            return (
-                              <button
-                                type="button"
-                                onClick={() => alert("Unenroll placeholder — UI only (no logic implemented yet)")}
-                                className="px-3 py-1 text-sm bg-warning/20 text-warning hover:bg-warning/30 rounded transition-all"
-                              >
-                                Unenroll
-                              </button>
-                            )
+                          const isEnrolled = enrolled.some((e: any) => {
+                            try {
+                              if (String(e.id) === String(user.id)) return true
+                              if (e.username && user.username && String(e.username).toLowerCase() === String(user.username).toLowerCase()) return true
+                              if (e.name && user.username && String(e.name).toLowerCase().includes(String(user.username).toLowerCase())) return true
+                            } catch (err) {
+                              // ignore
+                            }
+                            return false
+                          })
+                              if (isEnrolled) {
+                                return (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (!confirm(`Unenroll ${user.username} from all courses?`)) return
+                                      try {
+                                        const raw = localStorage.getItem("enrolledStudents")
+                                        const enrolled = raw ? JSON.parse(raw) : []
+                                        // find course ids for this student
+                                        const toRemove = enrolled.filter((e: any) => {
+                                          if (String(e.id) === String(user.id)) return true
+                                          if (e.username && user.username && String(e.username).toLowerCase() === String(user.username).toLowerCase()) return true
+                                          if (e.name && user.username && String(e.name).toLowerCase().includes(String(user.username).toLowerCase())) return true
+                                          return false
+                                        })
+                                        if (toRemove.length === 0) {
+                                          alert("No enrollments found for this student")
+                                          return
+                                        }
+                                        const rawCourses = localStorage.getItem("courses")
+                                        const parsedCourses = rawCourses ? JSON.parse(rawCourses) : []
+
+                                        let removedAny = false
+                                        for (const r of toRemove) {
+                                          const removed = removeEnrollment(r.id, r.courseId)
+                                          if (removed) {
+                                            removedAny = true
+                                            // decrement course count if present
+                                            const nextCourses = parsedCourses.map((c: any) =>
+                                              String(c.id) === String(r.courseId) ? { ...c, students: Math.max(0, Number(c.students || 0) - 1) } : c
+                                            )
+                                            localStorage.setItem("courses", JSON.stringify(nextCourses))
+                                          }
+                                        }
+
+                                        if (removedAny) {
+                                          try {
+                                            const rawAct = localStorage.getItem("activities")
+                                            const acts = rawAct ? JSON.parse(rawAct) : []
+                                            acts.push({ action: `Unenrolled ${user.username} (id:${user.id}) from ${toRemove.map((t: any) => t.courseName).join(", ")}`, timestamp: Date.now() })
+                                            localStorage.setItem("activities", JSON.stringify(acts))
+                                            window.dispatchEvent(new Event("activities-updated"))
+                                          } catch (e) {
+                                            console.error(e)
+                                          }
+
+                                          // trigger same-tab update & re-render
+                                          window.dispatchEvent(new Event("enrollment-updated"))
+                                          setRefreshCounter((n) => n + 1)
+                                        }
+                                      } catch (err) {
+                                        console.error(err)
+                                        alert("Failed to unenroll student; check console")
+                                      }
+                                    }}
+                                    className="px-3 py-1 text-sm bg-warning/20 text-warning hover:bg-warning/30 rounded transition-all"
+                                  >
+                                    Unenroll
+                                  </button>
+                                )
                           }
                         } catch (e) {
                           // ignore

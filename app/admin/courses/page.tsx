@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { useEffect } from "react"
 import { Card } from "@/components/ui/card"
+import { removeEnrollment } from "@/lib/enrollment"
 
 interface Course {
   id: string
@@ -433,7 +434,47 @@ export default function CoursesPage() {
                     <div className="flex gap-2">
                       <button
                         type="button"
-                        onClick={() => alert("Unenroll placeholder — no logic implemented yet")}
+                        onClick={() => {
+                          if (!confirm(`Unenroll ${s.name} from this course?`)) return
+                          try {
+                            const removed = removeEnrollment(s.id, studentsModalCourse)
+                            if (removed) {
+                              // decrement course students count
+                              try {
+                                const rawCourses = localStorage.getItem("courses")
+                                const parsedCourses = rawCourses ? JSON.parse(rawCourses) : []
+                                const nextCourses = parsedCourses.map((c: any) =>
+                                  String(c.id) === String(studentsModalCourse) ? { ...c, students: Math.max(0, Number(c.students || 0) - 1) } : c
+                                )
+                                localStorage.setItem("courses", JSON.stringify(nextCourses))
+                                setCourses(nextCourses)
+                              } catch (e) {
+                                console.error(e)
+                              }
+
+                              // remove locally so UI updates
+                              setStudentsForCourse((prev) => prev.filter((x) => String(x.id) !== String(s.id)))
+
+                              // record activity
+                              try {
+                                const rawAct = localStorage.getItem("activities")
+                                const acts = rawAct ? JSON.parse(rawAct) : []
+                                acts.push({ action: `Unenrolled ${s.username || s.name} (id:${s.id}) from course:${studentsModalCourse}`, timestamp: Date.now() })
+                                localStorage.setItem("activities", JSON.stringify(acts))
+                              } catch (e) {
+                                console.error(e)
+                              }
+
+                              window.dispatchEvent(new Event("activities-updated"))
+                              window.dispatchEvent(new Event("enrollment-updated"))
+                            } else {
+                              alert("No enrollment found to remove")
+                            }
+                          } catch (e) {
+                            console.error(e)
+                            alert("Failed to unenroll")
+                          }
+                        }}
                         className="px-3 py-1 text-sm bg-warning/20 text-warning hover:bg-warning/30 rounded transition-all"
                       >
                         Unenroll
