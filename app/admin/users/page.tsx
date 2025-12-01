@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { hashPassword, migrateStoredPasswords, looksHashed } from "@/lib/auth"
+import { hashPassword, migrateStoredPasswords, looksHashed, getUser } from "@/lib/auth"
 import { Card } from "@/components/ui/card"
 import { removeEnrollment } from "@/lib/enrollment"
 
@@ -32,6 +32,8 @@ export default function UsersPage() {
   })
 
   const [showModal, setShowModal] = useState(false)
+  const [activeAdmin, setActiveAdmin] = useState<any | null>(null)
+  const [activeTeacher, setActiveTeacher] = useState<any | null>(null)
   const [showEnrollModal, setShowEnrollModal] = useState(false)
   const [enrollingUserId, setEnrollingUserId] = useState<string | null>(null)
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null)
@@ -51,6 +53,62 @@ export default function UsersPage() {
       }
     }
     migrate().catch(() => {})
+
+    // load active admin and active teacher if present
+    try {
+      const rawActive = localStorage.getItem("activeAdmin")
+      setActiveAdmin(rawActive ? JSON.parse(rawActive) : null)
+    } catch (e) {
+      setActiveAdmin(null)
+    }
+    try {
+      const rawActiveT = localStorage.getItem("activeTeacher")
+      setActiveTeacher(rawActiveT ? JSON.parse(rawActiveT) : null)
+    } catch (e) {
+      setActiveTeacher(null)
+    }
+  }, [])
+
+  // keep activeAdmin in sync with other tabs and helper actions
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === "activeAdmin") {
+        try {
+          const raw = localStorage.getItem("activeAdmin")
+          setActiveAdmin(raw ? JSON.parse(raw) : null)
+        } catch (e) {
+          setActiveAdmin(null)
+        }
+      }
+      if (e.key === "activeTeacher") {
+        try {
+          const raw = localStorage.getItem("activeTeacher")
+          setActiveTeacher(raw ? JSON.parse(raw) : null)
+        } catch (e) {
+          setActiveTeacher(null)
+        }
+      }
+    }
+    const onActivities = () => {
+      try {
+        const raw = localStorage.getItem("activeAdmin")
+        setActiveAdmin(raw ? JSON.parse(raw) : null)
+      } catch (e) {
+        setActiveAdmin(null)
+      }
+      try {
+        const rawT = localStorage.getItem("activeTeacher")
+        setActiveTeacher(rawT ? JSON.parse(rawT) : null)
+      } catch (e) {
+        setActiveTeacher(null)
+      }
+    }
+    window.addEventListener("storage", onStorage)
+    window.addEventListener("activities-updated", onActivities)
+    return () => {
+      window.removeEventListener("storage", onStorage)
+      window.removeEventListener("activities-updated", onActivities)
+    }
   }, [])
   const [formError, setFormError] = useState("")
   const [refreshCounter, setRefreshCounter] = useState(0)
@@ -234,6 +292,126 @@ export default function UsersPage() {
     }
   }
 
+  const currentSession = getUser()
+
+  const assignTeacherTo = (target: any) => {
+    if (!currentSession) return
+    // only the currently active admin can assign teacher access
+    try {
+      const rawActive = localStorage.getItem("activeAdmin")
+      const active = rawActive ? JSON.parse(rawActive) : null
+      if (!active || String(active.username).toLowerCase() !== String(currentSession.username).toLowerCase()) {
+        alert("Only the active admin can assign teacher access.")
+        return
+      }
+
+      if (!confirm(`Grant teacher portal access to ${target.username}? This will make them the only eligible teacher.`)) return
+
+      const newActiveT = { id: target.id, username: target.username, setAt: Date.now() }
+      localStorage.setItem("activeTeacher", JSON.stringify(newActiveT))
+      setActiveTeacher(newActiveT)
+
+      // log activity
+      try {
+        const rawActs = localStorage.getItem("activities")
+        const acts = rawActs ? JSON.parse(rawActs) : []
+        acts.push({ actor: currentSession.username, action: "assign-teacher", to: target.username, teacherId: target.id, timestamp: Date.now() })
+        localStorage.setItem("activities", JSON.stringify(acts))
+        try { window.dispatchEvent(new Event("activities-updated")) } catch (e) {}
+      } catch (e) {
+        console.error("Failed to log teacher assign activity", e)
+      }
+    } catch (e) {
+      console.error(e)
+      alert("Failed to assign teacher access")
+    }
+  }
+
+  const revokeTeacherAccess = () => {
+    if (!currentSession) return
+    try {
+      const rawActive = localStorage.getItem("activeAdmin")
+      const active = rawActive ? JSON.parse(rawActive) : null
+      if (!active || String(active.username).toLowerCase() !== String(currentSession.username).toLowerCase()) {
+        alert("Only the active admin can revoke teacher access.")
+        return
+      }
+      if (!confirm("Revoke teacher portal access so no teacher can sign in until assigned?")) return
+      localStorage.removeItem("activeTeacher")
+      setActiveTeacher(null)
+      try {
+        const rawActs = localStorage.getItem("activities")
+        const acts = rawActs ? JSON.parse(rawActs) : []
+        acts.push({ actor: currentSession.username, action: "revoke-teacher", timestamp: Date.now() })
+        localStorage.setItem("activities", JSON.stringify(acts))
+        try { window.dispatchEvent(new Event("activities-updated")) } catch (e) {}
+      } catch (e) {
+        console.error(e)
+      }
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
+  const transferAdminTo = (target: any) => {
+    if (!currentSession) return
+    // only the currently active admin can transfer
+    try {
+      const rawActive = localStorage.getItem("activeAdmin")
+      const active = rawActive ? JSON.parse(rawActive) : null
+      if (!active || String(active.username).toLowerCase() !== String(currentSession.username).toLowerCase()) {
+        alert("Only the active admin can transfer admin access.")
+        return
+      }
+
+      if (!confirm(`Make ${target.username} the active admin? This will transfer admin portal access to them.`)) return
+
+      const newActive = { id: target.id, username: target.username, setAt: Date.now() }
+      localStorage.setItem("activeAdmin", JSON.stringify(newActive))
+      setActiveAdmin(newActive)
+
+      // log activity
+      try {
+        const rawActs = localStorage.getItem("activities")
+        const acts = rawActs ? JSON.parse(rawActs) : []
+        acts.push({ actor: currentSession.username, action: "transfer-admin", from: active ? active.username : null, to: target.username, timestamp: Date.now() })
+        localStorage.setItem("activities", JSON.stringify(acts))
+        try { window.dispatchEvent(new Event("activities-updated")) } catch (e) {}
+      } catch (e) {
+        console.error("Failed to log admin transfer activity", e)
+      }
+    } catch (e) {
+      console.error(e)
+      alert("Failed to transfer admin access")
+    }
+  }
+
+  const revokeAdminAccess = () => {
+    if (!currentSession) return
+    try {
+      const rawActive = localStorage.getItem("activeAdmin")
+      const active = rawActive ? JSON.parse(rawActive) : null
+      if (!active || String(active.username).toLowerCase() !== String(currentSession.username).toLowerCase()) {
+        alert("Only the active admin can revoke admin access.")
+        return
+      }
+      if (!confirm("Revoke admin portal access so no admin can sign in until transferred?")) return
+      localStorage.removeItem("activeAdmin")
+      setActiveAdmin(null)
+      try {
+        const rawActs = localStorage.getItem("activities")
+        const acts = rawActs ? JSON.parse(rawActs) : []
+        acts.push({ actor: currentSession.username, action: "revoke-admin", admin: currentSession.username, timestamp: Date.now() })
+        localStorage.setItem("activities", JSON.stringify(acts))
+        try { window.dispatchEvent(new Event("activities-updated")) } catch (e) {}
+      } catch (e) {
+        console.error(e)
+      }
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
   const roleColors = {
     student: "bg-blue-100 text-blue-800",
     teacher: "bg-green-100 text-green-800",
@@ -246,18 +424,38 @@ export default function UsersPage() {
         <div>
           <h1 className="text-4xl font-bold text-foreground mb-2">User Management</h1>
           <p className="text-muted-foreground">Manage all users in the system</p>
+          {activeAdmin ? (
+            <div className="mt-2 text-sm text-slate-600">Admin portal active: <strong className="ml-2">{activeAdmin.username}</strong></div>
+          ) : (
+            <div className="mt-2 text-sm text-slate-600">Admin portal not claimed — first admin to sign in becomes active, or existing active admin can transfer.</div>
+          )}
+          {activeTeacher ? (
+            <div className="mt-1 text-sm text-slate-600">Teacher access assigned to: <strong className="ml-2">{activeTeacher.username}</strong></div>
+          ) : (
+            <div className="mt-1 text-sm text-slate-600">Teacher access not restricted — any teacher may sign in unless assigned by admin.</div>
+          )}
         </div>
-        <button
-          onClick={() => {
-            setEditingUserId(null)
-            setFormData({ username: "", email: "", role: "student", password: "" })
-            setFormError("")
-            setShowModal(true)
-          }}
-          className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-6 py-2.5 rounded-lg transition-all"
-        >
-          + Add User
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => {
+              setEditingUserId(null)
+              setFormData({ username: "", email: "", role: "student", password: "" })
+              setFormError("")
+              setShowModal(true)
+            }}
+            className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-6 py-2.5 rounded-lg transition-all"
+          >
+            + Add User
+          </button>
+          {currentSession && activeAdmin && String(currentSession.username).toLowerCase() === String(activeAdmin.username).toLowerCase() && (
+            <>
+              <button onClick={revokeAdminAccess} className="px-3 py-1 text-sm bg-warning/20 text-warning rounded transition-all">Revoke Admin Access</button>
+              {activeTeacher ? (
+                <button onClick={revokeTeacherAccess} className="px-3 py-1 text-sm bg-warning/20 text-warning rounded transition-all">Revoke Teacher Access</button>
+              ) : null}
+            </>
+          )}
+        </div>
       </div>
 
       <Card className="overflow-hidden">
@@ -325,6 +523,47 @@ export default function UsersPage() {
                       >
                         Enroll
                       </button>
+                    )}
+
+                    {String(user.role).toLowerCase() === "admin" && (
+                      <>
+                        {activeAdmin && String(activeAdmin.username).toLowerCase() === String(user.username).toLowerCase() ? (
+                          <span className="px-3 py-1 text-sm bg-primary/20 text-primary rounded-full">Active Admin</span>
+                        ) : (
+                          // If current session is the active admin, allow transfer to this admin
+                          currentSession && String(currentSession.username).toLowerCase() === String(activeAdmin?.username || "").toLowerCase() ? (
+                            <button
+                              type="button"
+                              onClick={() => transferAdminTo(user)}
+                              className="px-3 py-1 text-sm bg-accent/20 text-accent hover:bg-accent/30 rounded transition-all"
+                            >
+                              Make Active
+                            </button>
+                          ) : (
+                            // not active admin — show locked badge
+                            <span className="px-3 py-1 text-sm bg-gray-100 text-gray-800 rounded">Locked</span>
+                          )
+                        )}
+                      </>
+                    )}
+                    {String(user.role).toLowerCase() === "teacher" && (
+                      <>
+                        {activeTeacher && String(activeTeacher.username).toLowerCase() === String(user.username).toLowerCase() ? (
+                          <span className="px-3 py-1 text-sm bg-primary/20 text-primary rounded-full">Active Teacher</span>
+                        ) : (
+                          currentSession && String(currentSession.username).toLowerCase() === String(activeAdmin?.username || "").toLowerCase() ? (
+                            <button
+                              type="button"
+                              onClick={() => assignTeacherTo(user)}
+                              className="px-3 py-1 text-sm bg-accent/20 text-accent hover:bg-accent/30 rounded transition-all"
+                            >
+                              Make Active
+                            </button>
+                          ) : (
+                            <span className="px-3 py-1 text-sm bg-gray-100 text-gray-800 rounded">Locked</span>
+                          )
+                        )}
+                      </>
                     )}
                     {String(user.role).toLowerCase() === "student" && (
                       (() => {

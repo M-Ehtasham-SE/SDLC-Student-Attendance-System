@@ -22,6 +22,18 @@ export default function TeacherLayout({
       router.push("/")
       return
     }
+
+    try {
+      const rawActiveT = localStorage.getItem("activeTeacher")
+      const activeT = rawActiveT ? JSON.parse(rawActiveT) : null
+      if (activeT && String(activeT.username).toLowerCase() !== String(currentUser.username).toLowerCase()) {
+        // only the assigned/active teacher may access teacher portal
+        router.push("/")
+        return
+      }
+    } catch (e) {
+      // ignore parse errors and allow entry
+    }
     setUser(currentUser)
     setLoading(false)
   }, [router])
