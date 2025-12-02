@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card"
 export function StyleGuide() {
   return (
     <div className="p-8 max-w-6xl mx-auto">
-      <h1 className="text-4xl font-bold text-foreground mb-2">EduMatrix Design System</h1>
+      <h1 className="text-4xl font-bold text-foreground mb-2">LearnSync Design System</h1>
       <p className="text-muted-foreground mb-12">Complete style guide for consistent UI/UX across all portals</p>
 
       {/* Colors */}
