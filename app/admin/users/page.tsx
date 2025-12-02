@@ -41,7 +41,7 @@ export default function UsersPage() {
   const [enrollingUserId, setEnrollingUserId] = useState<string | null>(null)
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null)
   const [enrollError, setEnrollError] = useState<string | null>(null)
-  const [formData, setFormData] = useState({ username: "", email: "", role: "student" as const, password: "" })
+  const [formData, setFormData] = useState<{ username: string; email: string; role: "student" | "teacher" | "admin"; password: string }>({ username: "", email: "", role: "student", password: "" })
   const [showPassword, setShowPassword] = useState(false)
 
   useEffect(() => {
@@ -624,11 +624,10 @@ export default function UsersPage() {
                                           // helper dispatched enrollment-updated, courses-updated and logs activities already
                                           // re-read courses so UI reflects updated counts
                                           try {
-                                            const rawCourses2 = localStorage.getItem("courses")
-                                            const parsed2 = rawCourses2 ? JSON.parse(rawCourses2) : []
-                                            setCourses(parsed2)
+                                            // notify other parts of the app that courses may have changed
+                                            try { window.dispatchEvent(new Event("courses-updated")) } catch (e) {}
                                           } catch (e) {
-                                            console.error("Failed to refresh courses after unenroll all", e)
+                                            console.error("Failed to notify courses update after unenroll all", e)
                                           }
                                           // trigger re-render for the users table
                                           setRefreshCounter((n) => n + 1)
