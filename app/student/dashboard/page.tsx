@@ -124,7 +124,24 @@ export default function StudentDashboard() {
         const nums = numeric.filter((n) => n !== null) as number[]
         return nums.length > 0 ? `${Math.round(nums.reduce((a, b) => a + b, 0) / nums.length)}%` : "—"
       })()
-      const gpa = "—"
+
+      // Calculate GPA from grades
+      const gpaValue = (() => {
+        const gradePoints: Record<string, number> = { A: 4.0, B: 3.0, C: 2.0, D: 1.0, F: 0.0 }
+        const validGrades = courseRows.filter((r) => r.grade !== "—" && gradePoints[r.grade] !== undefined)
+        if (validGrades.length === 0) return null
+        const totalPoints = validGrades.reduce((sum, r) => sum + gradePoints[r.grade], 0)
+        return totalPoints / validGrades.length
+      })()
+
+      const gpa = gpaValue !== null ? gpaValue.toFixed(2) : "—"
+
+      // Show alert if GPA is below 2.0
+      if (gpaValue !== null && gpaValue < 2.0) {
+        setTimeout(() => {
+          alert(`⚠️ Academic Alert\n\nYour GPA (${gpa}) has fallen below 2.0.\nPlease consider meeting with your academic advisor to discuss improvement strategies.`)
+        }, 500)
+      }
 
       setStats([
         { label: "Total Courses", value: String(totalCourses), icon: BookOpen, color: "text-blue-600" },
