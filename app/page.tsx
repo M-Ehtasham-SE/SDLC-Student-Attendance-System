@@ -21,7 +21,7 @@ export default function LoginPage() {
   const [confirmPassword, setConfirmPassword] = useState("")
   const [setPwError, setSetPwError] = useState("")
   const [isSetting, setIsSetting] = useState(false)
-  const setPwRef = useRef<HTMLDivElement | null>(null)
+  const setPwRef = useRef<HTMLFormElement | null>(null)
   const newPwRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
@@ -80,10 +80,20 @@ export default function LoginPage() {
             }
             // password matched -> allow login
           } else {
-            // account has no password set (likely created from admin UI) - require admin to set password
-            setError("This account does not have a password set. Please contact your administrator or create a new account.")
-            setIsLoading(false)
-            return
+            // account has no password set (likely created from admin UI)
+            // Teachers must contact admin to set their password; students may set their password via the Set Password flow
+            if (String(role).toLowerCase() === "teacher") {
+              setError("This account does not have a password set. Please contact your administrator.")
+              setIsLoading(false)
+              return
+            }
+
+            if (String(role).toLowerCase() === "student") {
+              // show the 'Set password' modal so admin-created students can set a password and sign in
+              setShowSetPwModal(true)
+              setIsLoading(false)
+              return
+            }
           }
         } else {
           // Ensure this password isn't already used by another account (compare hashed)
@@ -103,9 +113,16 @@ export default function LoginPage() {
             return
           }
 
-          // prevent self-registration for teachers: teachers must be created by admin
+          // prevent self-registration for teachers and students: teachers and students must be created by admin
           if (String(role).toLowerCase() === "teacher") {
             setError("Teacher accounts must be created by an administrator. Please ask your admin to add your account.")
+            setIsLoading(false)
+            return
+          }
+
+          if (String(role).toLowerCase() === "student") {
+            // block student self-registration — only admin-created or admin-enrolled students can sign in
+            setError("Student accounts must be created by an administrator or enrolled in a course by an administrator. Please contact your admin.")
             setIsLoading(false)
             return
           }
