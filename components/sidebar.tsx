@@ -29,13 +29,12 @@ export function Sidebar({ items, title }: SidebarProps) {
           <Link
             key={item.href}
             href={item.href}
-            className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
-              pathname === item.href
-                ? "bg-sidebar-primary/20 text-sidebar-primary font-semibold"
-                : "text-sidebar-foreground hover:bg-sidebar-accent/10"
-            }`}
+            className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all w-full group ${pathname === item.href
+                ? "bg-sidebar-primary/20 text-sidebar-primary font-semibold shadow-sm"
+                : "text-sidebar-foreground hover:bg-sidebar-accent/10 hover:text-sidebar-primary hover:translate-x-1"
+              }`}
           >
-            <span className="text-lg">{item.icon}</span>
+            <span className={`text-lg transition-transform group-hover:scale-110 ${pathname === item.href ? "scale-110" : ""}`}>{item.icon}</span>
             <span>{item.label}</span>
           </Link>
         ))}
