@@ -25,7 +25,7 @@ export default function LoginPage() {
   const newPwRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
-    migrateStoredPasswords().catch(() => {})
+    migrateStoredPasswords().catch(() => { })
   }, [])
 
   const checkStrength = (pw: string) => {
@@ -62,52 +62,35 @@ export default function LoginPage() {
       const existing = users.find((u) => (u.username || "").toLowerCase() === uname.toLowerCase())
 
       if (existing) {
-          // username exists
-          if (String(existing.role).toLowerCase() !== String(role).toLowerCase()) {
-            setError("This username is already taken by another role. Please choose a different username.")
-            setIsLoading(false)
-            return
-          }
-
-          // If the existing account has a password, validate it
-          if (existing.password !== undefined) {
-            // compare hashed values
-            const hashedInput = looksHashed(existing.password) ? await hashPassword(password) : password
-            if (existing.password !== hashedInput) {
-              setError("Incorrect password for this account")
-              setIsLoading(false)
-              return
-            }
-            // password matched -> allow login
-          } else {
-            // account has no password set (likely created from admin UI) - require admin to set password
-            setError("This account does not have a password set. Please contact your administrator or create a new account.")
-            setIsLoading(false)
-            return
-          }
-        } else {
-          // Ensure this password isn't already used by another account (compare hashed)
-          const hashedPw = await hashPassword(password)
-          const passConflict = users.find((u) => u.password && u.password === hashedPw)
-          if (passConflict) {
-            setError("This password is already used by another account. Please choose a different password.")
-            setIsLoading(false)
-            return
-          }
-
-          // require strong password
-          const st = checkStrength(password)
-          if (st.score < 4) {
-            setError("Password too weak — use 8+ chars, mix upper/lower, a digit and a symbol")
-            setIsLoading(false)
-            return
-          }
-
-          // create new user and persist (store password)
-          const newUser = { id: String(users.length + 1), username: uname, email: "", role, status: "active", password: hashedPw }
-          users.push(newUser)
-          localStorage.setItem("users", JSON.stringify(users))
+        // username exists
+        if (String(existing.role).toLowerCase() !== String(role).toLowerCase()) {
+          setError("This username is already taken by another role. Please choose a different username.")
+          setIsLoading(false)
+          return
         }
+
+        // If the existing account has a password, validate it
+        if (existing.password !== undefined) {
+          // compare hashed values
+          const hashedInput = looksHashed(existing.password) ? await hashPassword(password) : password
+          if (existing.password !== hashedInput) {
+            setError("Incorrect password for this account")
+            setIsLoading(false)
+            return
+          }
+          // password matched -> allow login
+        } else {
+          // account has no password set (likely created from admin UI) - require admin to set password
+          setError("This account does not have a password set. Please contact your administrator or create a new account.")
+          setIsLoading(false)
+          return
+        }
+      } else {
+        // Account not found - do not allow auto-creation
+        setError("Account not found. Please contact your administrator.")
+        setIsLoading(false)
+        return
+      }
       const user = { username: uname, role }
 
       // ADMIN ACCESS CONTROL: only one active admin allowed at a time
@@ -136,8 +119,8 @@ export default function LoginPage() {
               const acts = rawActs ? JSON.parse(rawActs) : []
               acts.push({ actor: uname, action: "become-active-admin", adminId, timestamp: Date.now() })
               localStorage.setItem("activities", JSON.stringify(acts))
-              try { window.dispatchEvent(new Event("activities-updated")) } catch(e){}
-            } catch(e) {
+              try { window.dispatchEvent(new Event("activities-updated")) } catch (e) { }
+            } catch (e) {
               console.error("Failed to set activeAdmin during login", e)
             }
           }
@@ -242,7 +225,7 @@ export default function LoginPage() {
             const acts = rawActs ? JSON.parse(rawActs) : []
             acts.push({ actor: users[targetIndex].username, action: "become-active-admin", adminId, timestamp: Date.now() })
             localStorage.setItem("activities", JSON.stringify(acts))
-            try { window.dispatchEvent(new Event("activities-updated")) } catch (e) {}
+            try { window.dispatchEvent(new Event("activities-updated")) } catch (e) { }
           }
         }
       } catch (e) {
@@ -450,11 +433,10 @@ export default function LoginPage() {
                     type="button"
                     key={r.id}
                     onClick={() => setRole(r.id)}
-                    className={`p-3 rounded-lg font-medium text-sm transition-all ${
-                      role === r.id
+                    className={`p-3 rounded-lg font-medium text-sm transition-all ${role === r.id
                         ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20"
                         : "bg-secondary/5 text-foreground border border-border hover:bg-secondary/10"
-                    }`}
+                      }`}
                   >
                     <div className="text-xl mb-1">{r.icon}</div>
                     {r.label}
@@ -468,23 +450,23 @@ export default function LoginPage() {
               <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded-lg text-sm">{error}</div>
             )}
 
-              {existingUser && !existingUser.password && (
-                <div className="text-sm text-foreground mt-2 flex items-center justify-between">
-                  <div className="text-slate-600">It looks like this account doesn't have a password yet.</div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setNewPassword("")
-                      setConfirmPassword("")
-                      setSetPwError("")
-                      setShowSetPwModal(true)
-                    }}
-                    className="text-sm text-blue-600 hover:underline ml-4"
-                  >
-                    Set password
-                  </button>
-                </div>
-              )}
+            {existingUser && !existingUser.password && (
+              <div className="text-sm text-foreground mt-2 flex items-center justify-between">
+                <div className="text-slate-600">It looks like this account doesn't have a password yet.</div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNewPassword("")
+                    setConfirmPassword("")
+                    setSetPwError("")
+                    setShowSetPwModal(true)
+                  }}
+                  className="text-sm text-blue-600 hover:underline ml-4"
+                >
+                  Set password
+                </button>
+              </div>
+            )}
 
             {/* Login Button */}
             <button
@@ -495,75 +477,75 @@ export default function LoginPage() {
               {isLoading ? "Signing in..." : "Continue"}
               {!isLoading && <ChevronRight className="w-4 h-4" />}
             </button>
-            </form>
+          </form>
 
-                {/* Set password modal for accounts that currently have no password */}
-                {showSetPwModal && (
-                  <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-                    <div className="absolute inset-0 bg-black/50" onClick={() => setShowSetPwModal(false)} />
-                    <form
-                      onSubmit={async (e) => {
-                        e.preventDefault()
-                        await handleSetPassword()
+          {/* Set password modal for accounts that currently have no password */}
+          {showSetPwModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+              <div className="absolute inset-0 bg-black/50" onClick={() => setShowSetPwModal(false)} />
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault()
+                  await handleSetPassword()
+                }}
+                ref={setPwRef}
+                className="relative z-10 w-full max-w-md p-6 bg-white rounded-lg shadow-lg"
+              >
+                <h3 className="text-lg font-bold mb-3 text-foreground">Set a password for your account</h3>
+                <p className="text-sm text-muted-foreground mb-4">Create a strong password so you can sign in going forward.</p>
+
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">New password</label>
+                    <input
+                      ref={newPwRef}
+                      type="password"
+                      value={newPassword}
+                      onChange={(e) => {
+                        setNewPassword(e.target.value)
+                        setSetPwError("")
                       }}
-                      ref={setPwRef}
-                      className="relative z-10 w-full max-w-md p-6 bg-white rounded-lg shadow-lg"
-                    >
-                      <h3 className="text-lg font-bold mb-3 text-foreground">Set a password for your account</h3>
-                      <p className="text-sm text-muted-foreground mb-4">Create a strong password so you can sign in going forward.</p>
-
-                      <div className="space-y-3">
-                        <div>
-                          <label className="block text-sm font-medium mb-1">New password</label>
-                          <input
-                            ref={newPwRef}
-                            type="password"
-                            value={newPassword}
-                            onChange={(e) => {
-                              setNewPassword(e.target.value)
-                              setSetPwError("")
-                            }}
-                            className="w-full px-3 py-2 border border-input rounded-lg"
-                            placeholder="Choose a strong password"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-sm font-medium mb-1">Confirm password</label>
-                          <input
-                            type="password"
-                            value={confirmPassword}
-                            onChange={(e) => {
-                              setConfirmPassword(e.target.value)
-                              setSetPwError("")
-                            }}
-                            className="w-full px-3 py-2 border border-input rounded-lg"
-                            placeholder="Repeat your password"
-                          />
-                        </div>
-
-                        {setPwError && <div className="text-sm text-red-600">{setPwError}</div>}
-                      </div>
-
-                      <div className="flex gap-3 mt-4">
-                        <button
-                          type="button"
-                          onClick={() => setShowSetPwModal(false)}
-                          className="flex-1 px-4 py-2 border rounded-lg text-foreground hover:bg-muted"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          type="submit"
-                          className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-60"
-                          disabled={isSetting}
-                        >
-                          {isSetting ? "Setting…" : "Set password & sign in"}
-                        </button>
-                      </div>
-                    </form>
+                      className="w-full px-3 py-2 border border-input rounded-lg"
+                      placeholder="Choose a strong password"
+                    />
                   </div>
-                )}
+
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Confirm password</label>
+                    <input
+                      type="password"
+                      value={confirmPassword}
+                      onChange={(e) => {
+                        setConfirmPassword(e.target.value)
+                        setSetPwError("")
+                      }}
+                      className="w-full px-3 py-2 border border-input rounded-lg"
+                      placeholder="Repeat your password"
+                    />
+                  </div>
+
+                  {setPwError && <div className="text-sm text-red-600">{setPwError}</div>}
+                </div>
+
+                <div className="flex gap-3 mt-4">
+                  <button
+                    type="button"
+                    onClick={() => setShowSetPwModal(false)}
+                    className="flex-1 px-4 py-2 border rounded-lg text-foreground hover:bg-muted"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-60"
+                    disabled={isSetting}
+                  >
+                    {isSetting ? "Setting…" : "Set password & sign in"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
 
           {/* Footer */}
           <p className="text-center text-xs text-muted-foreground">Demo mode • Use any username to explore</p>
