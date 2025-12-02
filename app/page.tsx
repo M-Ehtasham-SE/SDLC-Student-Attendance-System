@@ -170,6 +170,7 @@ export default function LoginPage() {
         } catch (e) {
           // ignore parsing errors and continue
         }
+
         localStorage.setItem("user", JSON.stringify(user))
         router.push("/teacher/dashboard")
       } else {
@@ -281,6 +282,8 @@ export default function LoginPage() {
       } catch (e) {
         // ignore parsing errors, proceed
       }
+
+      // persist session only after admin checks completed
 
       localStorage.setItem("user", JSON.stringify(sess))
       // show success toast

@@ -33,7 +33,10 @@ export default function UsersPage() {
 
   const [showModal, setShowModal] = useState(false)
   const [activeAdmin, setActiveAdmin] = useState<any | null>(null)
+ 
   const [activeTeacher, setActiveTeacher] = useState<any | null>(null)
+ 
+ 
   const [showEnrollModal, setShowEnrollModal] = useState(false)
   const [enrollingUserId, setEnrollingUserId] = useState<string | null>(null)
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null)
@@ -352,7 +355,6 @@ export default function UsersPage() {
       console.error(e)
     }
   }
-
   const transferAdminTo = (target: any) => {
     if (!currentSession) return
     // only the currently active admin can transfer
