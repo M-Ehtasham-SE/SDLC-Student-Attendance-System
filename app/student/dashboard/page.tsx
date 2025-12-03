@@ -143,6 +143,15 @@ export default function StudentDashboard() {
         }, 500)
       }
 
+      // Show alert if any course attendance is below 75%
+      const lowAttendanceCourses = courseRows.filter((c) => c.attendance !== "—" && Number.parseInt(c.attendance) < 75)
+      if (lowAttendanceCourses.length > 0) {
+        const courseList = lowAttendanceCourses.map((c) => `• ${c.name}: ${c.attendance}`).join('\n')
+        setTimeout(() => {
+          alert(`⚠️ Attendance Alert\n\nYou have ${lowAttendanceCourses.length} course(s) with attendance below 75%:\n\n${courseList}\n\nWarning: Attendance below 75% may affect your eligibility for exams.\nPlease improve your attendance immediately.`)
+        }, 1000)
+      }
+
       setStats([
         { label: "Total Courses", value: String(totalCourses), icon: BookOpen, color: "text-blue-600" },
         { label: "Avg Attendance", value: avgAttendance, icon: CheckCircle2, color: "text-emerald-600" },
