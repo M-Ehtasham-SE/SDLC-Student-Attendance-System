@@ -1,31 +1,53 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { Card } from "@/components/ui/card"
+import { getUser } from "@/lib/auth"
 
 interface AttendanceRecord {
   date: string
   status: "present" | "absent"
 }
 
+interface Course {
+  id: string
+  name: string
+}
+
 export default function AttendancePage() {
-  const [selectedCourse, setSelectedCourse] = useState("math101")
-  const [attendanceData] = useState<Record<string, AttendanceRecord[]>>({
-    math101: [
-      { date: "2024-01-15", status: "present" },
-      { date: "2024-01-16", status: "present" },
-      { date: "2024-01-17", status: "absent" },
-      { date: "2024-01-18", status: "present" },
-      { date: "2024-01-19", status: "present" },
-      { date: "2024-01-22", status: "present" },
-      { date: "2024-01-23", status: "present" },
-      { date: "2024-01-24", status: "absent" },
-      { date: "2024-01-25", status: "present" },
-      { date: "2024-01-26", status: "present" },
-      { date: "2024-01-29", status: "present" },
-      { date: "2024-01-30", status: "present" },
-    ],
-  })
+  const router = useRouter()
+  const [selectedCourse, setSelectedCourse] = useState<string | null>(null)
+  const [attendanceData, setAttendanceData] = useState<Record<string, AttendanceRecord[]>>({})
+  const [availableCourses, setAvailableCourses] = useState<Course[]>([])
+
+  // Load user and courses on mount
+  useEffect(() => {
+    try {
+      const user = getUser()
+      if (!user) {
+        router.push("/")
+        return
+      }
+
+      // Load courses from localStorage
+      const rawCourses = localStorage.getItem("courses")
+      const courses = rawCourses ? JSON.parse(rawCourses) : []
+      setAvailableCourses(courses)
+      
+      // Load attendance records from localStorage
+      const rawAttendance = localStorage.getItem("attendance")
+      const attendance = rawAttendance ? JSON.parse(rawAttendance) : {}
+      setAttendanceData(attendance)
+
+      // Set first course as default
+      if (courses.length > 0) {
+        setSelectedCourse(courses[0].id)
+      }
+    } catch (e) {
+      console.error("Failed to load attendance data:", e)
+    }
+  }, [])
 
   const records = attendanceData[selectedCourse] || []
   const presentCount = records.filter((r) => r.status === "present").length
@@ -48,13 +70,19 @@ export default function AttendancePage() {
       <div className="mb-8">
         <label className="block text-sm font-medium mb-2 text-foreground">Select Course</label>
         <select
-          value={selectedCourse}
+          value={selectedCourse || ""}
           onChange={(e) => setSelectedCourse(e.target.value)}
           className="w-full md:w-64 px-4 py-2.5 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary bg-background text-foreground"
         >
-          <option value="math101">Mathematics 101</option>
-          <option value="calc201">Advanced Calculus</option>
-          <option value="stats201">Statistics 201</option>
+          {availableCourses.length === 0 ? (
+            <option value="">No courses available</option>
+          ) : (
+            availableCourses.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))
+          )}
         </select>
       </div>
 
@@ -88,30 +116,36 @@ export default function AttendancePage() {
         </div>
 
         <div className="divide-y divide-border max-h-96 overflow-y-auto">
-          {records.map((record, idx) => (
-            <div key={idx} className="p-4 flex items-center justify-between hover:bg-muted/50 transition-all">
-              <div className="flex items-center gap-4">
-                <div
-                  className={`w-12 h-12 rounded-lg flex items-center justify-center font-bold text-white ${
-                    record.status === "present" ? "bg-green-500" : "bg-red-500"
+          {records.length === 0 ? (
+            <div className="p-6 text-center text-muted-foreground">
+              No attendance records marked by teacher yet for this course.
+            </div>
+          ) : (
+            records.map((record, idx) => (
+              <div key={idx} className="p-4 flex items-center justify-between hover:bg-muted/50 transition-all">
+                <div className="flex items-center gap-4">
+                  <div
+                    className={`w-12 h-12 rounded-lg flex items-center justify-center font-bold text-white ${
+                      record.status === "present" ? "bg-green-500" : "bg-red-500"
+                    }`}
+                  >
+                    {record.status === "present" ? "✓" : "✗"}
+                  </div>
+                  <div>
+                    <p className="font-medium text-foreground">{formatDate(record.date)}</p>
+                    <p className="text-sm text-muted-foreground capitalize">{record.status}</p>
+                  </div>
+                </div>
+                <span
+                  className={`px-3 py-1 rounded-full text-xs font-semibold capitalize ${
+                    record.status === "present" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
                   }`}
                 >
-                  {record.status === "present" ? "✓" : "✗"}
-                </div>
-                <div>
-                  <p className="font-medium text-foreground">{formatDate(record.date)}</p>
-                  <p className="text-sm text-muted-foreground capitalize">{record.status}</p>
-                </div>
+                  {record.status}
+                </span>
               </div>
-              <span
-                className={`px-3 py-1 rounded-full text-xs font-semibold capitalize ${
-                  record.status === "present" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
-                }`}
-              >
-                {record.status}
-              </span>
-            </div>
-          ))}
+            ))
+          )}
         </div>
       </Card>
     </div>
